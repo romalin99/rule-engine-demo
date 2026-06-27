@@ -21,13 +21,19 @@ import (
 type Server struct {
 	eng *Engine
 	mgr *Manager
-	sem *Semaphore // caps concurrent users in rule judgment (Phase 5: ≤200)
+	sem *Semaphore        // caps concurrent users in rule judgment (Phase 5: ≤200)
+	lat *latencyRecorder  // recent /match latencies for p50/p90/p99
 }
 
 // NewServer wraps an engine in a Fiber-backed HTTP handler. Online scoring is
 // bounded to MaxConcurrentUsers concurrent requests.
 func NewServer(eng *Engine) *Server {
-	return &Server{eng: eng, mgr: NewManager(eng), sem: NewSemaphore(MaxConcurrentUsers)}
+	return &Server{
+		eng: eng,
+		mgr: NewManager(eng),
+		sem: NewSemaphore(MaxConcurrentUsers),
+		lat: newLatencyRecorder(4096),
+	}
 }
 
 // matchResponse is returned by /match for a single user.
@@ -154,6 +160,13 @@ func (s *Server) handleMetrics(c fiber.Ctx) error {
 	b.WriteString("# HELP rule_engine_max_concurrency Max concurrent users (Phase 5 cap).\n")
 	b.WriteString("# TYPE rule_engine_max_concurrency gauge\n")
 	fmt.Fprintf(&b, "rule_engine_max_concurrency %d\n", s.sem.Cap())
+	p50, p90, p99, n := s.lat.Percentiles()
+	b.WriteString("# HELP rule_engine_match_latency_ms Online /match latency percentiles (recent window).\n")
+	b.WriteString("# TYPE rule_engine_match_latency_ms gauge\n")
+	fmt.Fprintf(&b, "rule_engine_match_latency_ms{quantile=\"0.5\"} %.3f\n", p50)
+	fmt.Fprintf(&b, "rule_engine_match_latency_ms{quantile=\"0.9\"} %.3f\n", p90)
+	fmt.Fprintf(&b, "rule_engine_match_latency_ms{quantile=\"0.99\"} %.3f\n", p99)
+	fmt.Fprintf(&b, "rule_engine_match_latency_samples %d\n", n)
 	c.Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 	return c.SendString(b.String())
 }
@@ -167,7 +180,10 @@ func (s *Server) handleMatch(c fiber.Ctx) error {
 	// Phase 5: at most MaxConcurrentUsers users judged concurrently; excess queues.
 	s.sem.Acquire()
 	defer s.sem.Release()
-	return c.JSON(s.scoreOne(u))
+	t0 := time.Now()
+	resp := s.scoreOne(u)
+	s.lat.Record(time.Since(t0))
+	return c.JSON(resp)
 }
 
 func (s *Server) handleBatch(c fiber.Ctx) error {
