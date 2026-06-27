@@ -18,6 +18,7 @@ type Rule struct {
 	Name     string `json:"name"`
 	Expr     string `json:"rule"`
 	Priority int    `json:"priority"` // higher sorts first
+	Version  int    `json:"version"`  // monotonic per-rule revision (0 = unset)
 	Enabled  bool   `json:"enabled"`
 }
 
@@ -31,6 +32,7 @@ func (r *Rule) UnmarshalJSON(b []byte) error {
 		Rule     string `json:"rule"`
 		Expr     string `json:"expr"`
 		Priority int    `json:"priority"`
+		Version  int    `json:"version"`
 		Enabled  *bool  `json:"enabled"`
 	}
 	if err := json.Unmarshal(b, &raw); err != nil {
@@ -44,6 +46,7 @@ func (r *Rule) UnmarshalJSON(b []byte) error {
 		r.Expr = raw.Expr
 	}
 	r.Priority = raw.Priority
+	r.Version = raw.Version
 	r.Enabled = raw.Enabled == nil || *raw.Enabled // default true
 	return nil
 }
@@ -55,8 +58,9 @@ func (r Rule) MarshalJSON() ([]byte, error) {
 		Name     string `json:"name"`
 		Expr     string `json:"expr"`
 		Priority int    `json:"priority"`
+		Version  int    `json:"version"`
 		Enabled  bool   `json:"enabled"`
-	}{ID: r.ID, Name: r.Name, Expr: r.Expr, Priority: r.Priority, Enabled: r.Enabled})
+	}{ID: r.ID, Name: r.Name, Expr: r.Expr, Priority: r.Priority, Version: r.Version, Enabled: r.Enabled})
 }
 
 // RuleProgram is a compiled, cached rule.
@@ -70,6 +74,7 @@ type RuleProgram struct {
 	ID       int64
 	Name     string
 	Priority int    // copied from Rule; controls match/sort order (higher first)
+	Version  int    // copied from Rule; per-rule revision for hot-update tracking
 	Source   string // original expression text (for logging / debugging)
 	AST      any    // compiled expr.Node
 }

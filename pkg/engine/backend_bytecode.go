@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"github.com/example/rule-engine-demo/pkg/ir"
 	"github.com/example/rule-engine-demo/pkg/vm"
 )
 
@@ -28,7 +29,7 @@ func (b *BytecodeBackend) Compile(exprText string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return vm.Compile(node)
+	return vm.Compile(ir.Optimize(node))
 }
 
 // NewContext returns the row map directly — the VM evaluates against

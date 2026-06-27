@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/example/rule-engine-demo/pkg/api"
+	"github.com/example/rule-engine-demo/pkg/ir"
 	"github.com/example/rule-engine-demo/pkg/vm"
 )
 
@@ -23,7 +24,7 @@ func (*Runtime) Name() string { return "bytecode" }
 
 // Compile lowers the IR program into a reusable bytecode plan.
 func (*Runtime) Compile(program api.Program) (api.Plan, error) {
-	return vm.Compile(program)
+	return vm.Compile(ir.Optimize(program))
 }
 
 // Execute evaluates a compiled bytecode plan against a row.

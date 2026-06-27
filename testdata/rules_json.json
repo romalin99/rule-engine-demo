@@ -1,0 +1,10 @@
+{
+  "comment": "Sample JSON-DSL rule (use engine.JSONFrontend). Equivalent to rule #4 in rules.json.",
+  "and": [
+    { "field": "age", "op": "between", "values": [25, 40] },
+    { "field": "province", "op": "in", "values": ["广东", "江苏", "浙江"] },
+    { "field": "income_level", "op": "in", "values": ["20k-30k", "30k+"] },
+    { "field": "favorite_category", "op": "like", "value": "数%" },
+    { "field": "active_score", "op": ">=", "value": 85 }
+  ]
+}

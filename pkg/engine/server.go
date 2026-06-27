@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/example/rule-engine-demo/pkg/model"
@@ -20,10 +21,14 @@ import (
 type Server struct {
 	eng *Engine
 	mgr *Manager
+	sem *Semaphore // caps concurrent users in rule judgment (Phase 5: ≤200)
 }
 
-// NewServer wraps an engine in a Fiber-backed HTTP handler.
-func NewServer(eng *Engine) *Server { return &Server{eng: eng, mgr: NewManager(eng)} }
+// NewServer wraps an engine in a Fiber-backed HTTP handler. Online scoring is
+// bounded to MaxConcurrentUsers concurrent requests.
+func NewServer(eng *Engine) *Server {
+	return &Server{eng: eng, mgr: NewManager(eng), sem: NewSemaphore(MaxConcurrentUsers)}
+}
 
 // matchResponse is returned by /match for a single user.
 type matchResponse struct {
@@ -40,6 +45,7 @@ func (s *Server) App() *fiber.App {
 	// Scoring
 	app.Get("/healthz", s.handleHealth)
 	app.Get("/rules", s.handleRules)         // rule count
+	app.Get("/metrics", s.handleMetrics)     // Prometheus text exposition
 	app.Post("/match", s.handleMatch)        // single user
 	app.Post("/match/batch", s.handleBatch)  // array of users
 	// Operations console (step 11)
@@ -132,12 +138,35 @@ func (s *Server) handleRules(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"rules": s.eng.RuleCount()})
 }
 
+// handleMetrics exposes engine metrics in Prometheus text exposition format
+// (dependency-free) so a Prometheus server can scrape /metrics directly.
+func (s *Server) handleMetrics(c fiber.Ctx) error {
+	var b strings.Builder
+	b.WriteString("# HELP rule_engine_rules Number of active compiled rules.\n")
+	b.WriteString("# TYPE rule_engine_rules gauge\n")
+	fmt.Fprintf(&b, "rule_engine_rules %d\n", s.eng.RuleCount())
+	b.WriteString("# HELP rule_engine_versions Number of published rule-set versions.\n")
+	b.WriteString("# TYPE rule_engine_versions gauge\n")
+	fmt.Fprintf(&b, "rule_engine_versions %d\n", len(s.mgr.Versions()))
+	b.WriteString("# HELP rule_engine_inflight Users currently being judged.\n")
+	b.WriteString("# TYPE rule_engine_inflight gauge\n")
+	fmt.Fprintf(&b, "rule_engine_inflight %d\n", s.sem.InFlight())
+	b.WriteString("# HELP rule_engine_max_concurrency Max concurrent users (Phase 5 cap).\n")
+	b.WriteString("# TYPE rule_engine_max_concurrency gauge\n")
+	fmt.Fprintf(&b, "rule_engine_max_concurrency %d\n", s.sem.Cap())
+	c.Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	return c.SendString(b.String())
+}
+
 func (s *Server) handleMatch(c fiber.Ctx) error {
 	var u model.User
 	if err := c.Bind().Body(&u); err != nil {
 		return c.Status(fiber.StatusBadRequest).
 			JSON(fiber.Map{"error": "bad user json: " + err.Error()})
 	}
+	// Phase 5: at most MaxConcurrentUsers users judged concurrently; excess queues.
+	s.sem.Acquire()
+	defer s.sem.Release()
 	return c.JSON(s.scoreOne(u))
 }
 
@@ -149,12 +178,24 @@ func (s *Server) handleBatch(c fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).
 			JSON(fiber.Map{"error": "bad users json: " + err.Error()})
 	}
+	// Phase 5: bound concurrency to MaxConcurrentUsers across the batch.
+	s.sem.Acquire()
+	defer s.sem.Release()
+	results := s.eng.MatchBatchBounded(users)
 	out := make([]matchResponse, len(users))
 	for i := range users {
-		if users[i].UID == 0 {
-			users[i].UID = int64(i + 1)
+		uid := users[i].UID
+		if uid == 0 {
+			uid = int64(i + 1)
 		}
-		out[i] = s.scoreOne(users[i])
+		ids := results[i].RuleIDs
+		names := make([]string, 0, len(ids))
+		for _, id := range ids {
+			if p, ok := s.eng.Cache().Get(id); ok {
+				names = append(names, p.Name)
+			}
+		}
+		out[i] = matchResponse{UID: uid, Hits: len(ids), RuleIDs: ids, Names: names}
 	}
 	return c.JSON(out)
 }

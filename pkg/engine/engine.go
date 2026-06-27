@@ -77,7 +77,7 @@ func (e *Engine) compile(rules []model.Rule) (progs []*model.RuleProgram, failed
 			continue
 		}
 		progs = append(progs, &model.RuleProgram{
-			ID: r.ID, Name: r.Name, Priority: r.Priority, Source: r.Expr, AST: ast,
+			ID: r.ID, Name: r.Name, Priority: r.Priority, Version: r.Version, Source: r.Expr, AST: ast,
 		})
 	}
 	return progs, failed

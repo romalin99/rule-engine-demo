@@ -36,7 +36,7 @@ func NewManager(eng *Engine) *Manager {
 	m := &Manager{eng: eng, rules: make(map[int64]model.Rule)}
 	for _, p := range eng.Cache().Snapshot() {
 		m.rules[p.ID] = model.Rule{
-			ID: p.ID, Name: p.Name, Expr: p.Source, Priority: p.Priority, Enabled: true,
+			ID: p.ID, Name: p.Name, Expr: p.Source, Priority: p.Priority, Version: p.Version, Enabled: true,
 		}
 	}
 	return m
@@ -60,6 +60,14 @@ func (m *Manager) Upsert(r model.Rule) error {
 	if r.ID == 0 {
 		return fmt.Errorf("rule id is required")
 	}
+	// Auto-increment the per-rule version on each edit unless the caller pinned one.
+	m.mu.Lock()
+	if prev, ok := m.rules[r.ID]; ok && r.Version <= prev.Version {
+		r.Version = prev.Version + 1
+	} else if r.Version == 0 {
+		r.Version = 1
+	}
+	m.mu.Unlock()
 	if r.Enabled {
 		if err := m.eng.AddRule(r); err != nil {
 			return err

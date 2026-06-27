@@ -1,0 +1,74 @@
+[
+  {
+    "uid": 1, "username": "user001", "gender": "男", "age": 28, "province": "广东", "city": "深圳",
+    "occupation": "程序员", "education": "本科", "marital_status": "未婚", "income_level": "20k-30k",
+    "vip_level": 3, "register_days": 620, "login_days_30d": 28, "order_count": 132,
+    "total_amount": 35628.56, "avg_order_amount": 269.91, "favorite_category": "数码",
+    "device_type": "iPhone", "os_type": "iOS", "browser": "Safari", "app_version": "8.2.1",
+    "active_score": 91.52, "credit_score": 765, "risk_level": "低",
+    "tag1": "高价值", "tag2": "数码爱好者", "tag3": "夜猫子"
+  },
+  {
+    "uid": 2, "username": "user002", "gender": "女", "age": 35, "province": "上海", "city": "上海",
+    "occupation": "教师", "education": "硕士", "marital_status": "已婚", "income_level": "10k-20k",
+    "vip_level": 2, "register_days": 981, "login_days_30d": 22, "order_count": 58,
+    "total_amount": 12689.00, "avg_order_amount": 218.78, "favorite_category": "图书",
+    "device_type": "Android", "os_type": "Android", "browser": "Chrome", "app_version": "8.1.5",
+    "active_score": 76.30, "credit_score": 698, "risk_level": "中",
+    "tag1": "亲子", "tag2": "教育", "tag3": "高频登录"
+  },
+  {
+    "uid": 3, "username": "user003", "gender": "男", "age": 41, "province": "北京", "city": "北京",
+    "occupation": "销售", "education": "本科", "marital_status": "已婚", "income_level": "30k+",
+    "vip_level": 4, "register_days": 1350, "login_days_30d": 30, "order_count": 352,
+    "total_amount": 185962.20, "avg_order_amount": 528.30, "favorite_category": "汽车",
+    "device_type": "Windows", "os_type": "Windows", "browser": "Edge", "app_version": "PC",
+    "active_score": 98.15, "credit_score": 822, "risk_level": "低",
+    "tag1": "高净值", "tag2": "商务", "tag3": "忠诚用户"
+  },
+  {
+    "uid": 4, "username": "user004", "gender": "女", "age": 23, "province": "浙江", "city": "杭州",
+    "occupation": "学生", "education": "本科", "marital_status": "未婚", "income_level": "<5k",
+    "vip_level": 1, "register_days": 128, "login_days_30d": 18, "order_count": 12,
+    "total_amount": 1328.90, "avg_order_amount": 110.74, "favorite_category": "美妆",
+    "device_type": "iPhone", "os_type": "iOS", "browser": "Safari", "app_version": "8.2.0",
+    "active_score": 65.42, "credit_score": 640, "risk_level": "低",
+    "tag1": "学生", "tag2": "美妆", "tag3": "价格敏感"
+  },
+  {
+    "uid": 5, "username": "user005", "gender": "男", "age": 31, "province": "四川", "city": "成都",
+    "occupation": "产品经理", "education": "硕士", "marital_status": "已婚", "income_level": "20k-30k",
+    "vip_level": 3, "register_days": 782, "login_days_30d": 29, "order_count": 168,
+    "total_amount": 60281.80, "avg_order_amount": 358.82, "favorite_category": "家电",
+    "device_type": "Mac", "os_type": "macOS", "browser": "Chrome", "app_version": "Web",
+    "active_score": 89.73, "credit_score": 781, "risk_level": "低",
+    "tag1": "高消费", "tag2": "智能家居", "tag3": "会员"
+  },
+  {
+    "uid": 6, "username": "user006", "gender": "男", "age": 48, "province": "广东", "city": "广州",
+    "occupation": "个体", "education": "高中", "marital_status": "已婚", "income_level": "10k-20k",
+    "vip_level": 2, "register_days": 300, "login_days_30d": 3, "order_count": 9,
+    "total_amount": 60000.00, "avg_order_amount": 480.00, "favorite_category": "数码周边",
+    "device_type": "Android", "os_type": "Android", "browser": "Chrome", "app_version": "8.0.0",
+    "active_score": 40.10, "credit_score": 580, "risk_level": "高",
+    "tag1": "价格敏感", "tag2": "商务", "tag3": "夜猫子"
+  },
+  {
+    "uid": 7, "username": "user007", "gender": "男", "age": 33, "province": "广东", "city": "深圳",
+    "occupation": "程序员", "education": "硕士", "marital_status": "未婚", "income_level": "30k+",
+    "vip_level": 4, "register_days": 900, "login_days_30d": 27, "order_count": 210,
+    "total_amount": 88000.00, "avg_order_amount": 419.05, "favorite_category": "数码产品",
+    "device_type": "iPhone", "os_type": "iOS", "browser": "Safari", "app_version": "9.0.0",
+    "active_score": 93.40, "credit_score": 800, "risk_level": "低",
+    "tag1": "高价值", "tag2": "数码爱好者", "tag3": "会员"
+  },
+  {
+    "uid": 8, "username": "user008", "gender": "女", "age": 38, "province": "江苏", "city": "南京",
+    "occupation": "设计师", "education": "本科", "marital_status": "已婚", "income_level": "20k-30k",
+    "vip_level": 3, "register_days": 1100, "login_days_30d": 20, "order_count": 95,
+    "total_amount": 27800.00, "avg_order_amount": 292.63, "favorite_category": "服饰",
+    "device_type": "iPhone", "os_type": "iOS", "browser": "Safari", "app_version": "8.2.1",
+    "active_score": 87.10, "credit_score": 740, "risk_level": "低",
+    "tag1": "高消费", "tag2": "会员", "tag3": "高频登录"
+  }
+]
