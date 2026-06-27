@@ -26,7 +26,8 @@ import (
 //	{"field":"phone","op":"isnull"}              // or "isnotnull"
 //
 // op ∈ { =, ==, !=, <>, >, >=, <, <=, between, in, not_in, like, not_like,
-//        isnull, isnotnull }
+//
+//	isnull, isnotnull }
 type JSONFrontend struct{}
 
 // Name identifies the frontend.

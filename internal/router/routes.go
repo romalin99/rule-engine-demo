@@ -56,21 +56,21 @@ func (s *Server) App() *fiber.App {
 	app := fiber.New()
 	// Scoring
 	app.Get("/healthz", s.handleHealth)
-	app.Get("/ping2", s.handlePing2)         // lightweight liveness probe
-	app.Get("/rules", s.handleRules)         // rule count
-	app.Get("/metrics", s.handleMetrics)     // Prometheus text exposition
-	app.Post("/match", s.handleMatch)        // single user
-	app.Post("/match/batch", s.handleBatch)  // array of users
-	app.Post("/evaluate", s.handleEvaluate)  // pass/fail + reasons against one rule tree
+	app.Get("/ping2", s.handlePing2)        // lightweight liveness probe
+	app.Get("/rules", s.handleRules)        // rule count
+	app.Get("/metrics", s.handleMetrics)    // Prometheus text exposition
+	app.Post("/match", s.handleMatch)       // single user
+	app.Post("/match/batch", s.handleBatch) // array of users
+	app.Post("/evaluate", s.handleEvaluate) // pass/fail + reasons against one rule tree
 	// Operations console (step 11)
 	app.Get("/", s.handleEditor)             // web rule editor
 	app.Get("/rules/list", s.handleRuleList) // list editable rules
 	app.Post("/rules", s.handleRuleUpsert)   // add/update a rule (live)
 	app.Delete("/rules/:id", s.handleRuleDelete)
-	app.Post("/rules/test", s.handleRuleTest)        // test draft vs sample row
-	app.Post("/rules/selftest", s.handleSelfTest)    // live add complex rule -> match -> delete (proof)
-	app.Get("/versions", s.handleVersionList)        // published snapshots
-	app.Post("/versions", s.handlePublish)           // snapshot current set
+	app.Post("/rules/test", s.handleRuleTest)     // test draft vs sample row
+	app.Post("/rules/selftest", s.handleSelfTest) // live add complex rule -> match -> delete (proof)
+	app.Get("/versions", s.handleVersionList)     // published snapshots
+	app.Post("/versions", s.handlePublish)        // snapshot current set
 	app.Post("/versions/:v/rollback", s.handleRollback)
 	return app
 }

@@ -16,7 +16,8 @@
 //	{"field":"phone","op":"isnull"}              // or "isnotnull"
 //
 // op ∈ { =, ==, !=, <>, >, >=, <, <=, between, in, not_in, like, not_like,
-//        isnull, isnotnull }. The '<>' alias is accepted as not-equal.
+//
+//	isnull, isnotnull }. The '<>' alias is accepted as not-equal.
 package json
 
 import (

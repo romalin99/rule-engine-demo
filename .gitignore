@@ -1,5 +1,6 @@
 # ==================== Rust / Cargo ====================
 
+cmd/api/rulex
 # Build output
 target/
 # Cargo lock file

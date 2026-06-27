@@ -63,8 +63,8 @@ type Not struct {
 
 func (Logic) node()   {}
 func (Compare) node() {}
-func (Between) node()  {}
-func (In) node()       {}
-func (Like) node()     {}
-func (IsNull) node()   {}
-func (Not) node()      {}
+func (Between) node() {}
+func (In) node()      {}
+func (Like) node()    {}
+func (IsNull) node()  {}
+func (Not) node()     {}

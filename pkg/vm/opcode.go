@@ -13,26 +13,26 @@ package vm
 type OpCode uint8
 
 const (
-	OpLoadField   OpCode = iota // A=field idx:   push row[field]
-	OpConstNum                  // A=num idx:     push number const
-	OpConstStr                  // A=str idx:     push string const
-	OpEq                        // pop b,a:       push a == b
-	OpNe                        // pop b,a:       push a != b
-	OpGt                        // pop b,a:       push a > b
-	OpGe                        // pop b,a:       push a >= b
-	OpLt                        // pop b,a:       push a < b
-	OpLe                        // pop b,a:       push a <= b
-	OpBetween                   // pop hi,lo,x:   push lo <= x <= hi
-	OpIn                        // A=set idx:     pop x, push x in set
-	OpLikePrefix                // A=str idx:     pop x, push hasPrefix(x, s)
-	OpLikeSuffix                // A=str idx:     pop x, push hasSuffix(x, s)
-	OpLikeContains              // A=str idx:     pop x, push contains(x, s)
-	OpLikeEq                    // A=str idx:     pop x, push x == s
-	OpIsNull                    // pop x:         push x is null/missing
-	OpIsNotNull                 // pop x:         push x is present/non-null
-	OpAnd                       // pop b,a:       push a && b
-	OpOr                        // pop b,a:       push a || b
-	OpNot                       // pop a:         push !a  (NOT / NOT IN / NOT LIKE)
+	OpLoadField    OpCode = iota // A=field idx:   push row[field]
+	OpConstNum                   // A=num idx:     push number const
+	OpConstStr                   // A=str idx:     push string const
+	OpEq                         // pop b,a:       push a == b
+	OpNe                         // pop b,a:       push a != b
+	OpGt                         // pop b,a:       push a > b
+	OpGe                         // pop b,a:       push a >= b
+	OpLt                         // pop b,a:       push a < b
+	OpLe                         // pop b,a:       push a <= b
+	OpBetween                    // pop hi,lo,x:   push lo <= x <= hi
+	OpIn                         // A=set idx:     pop x, push x in set
+	OpLikePrefix                 // A=str idx:     pop x, push hasPrefix(x, s)
+	OpLikeSuffix                 // A=str idx:     pop x, push hasSuffix(x, s)
+	OpLikeContains               // A=str idx:     pop x, push contains(x, s)
+	OpLikeEq                     // A=str idx:     pop x, push x == s
+	OpIsNull                     // pop x:         push x is null/missing
+	OpIsNotNull                  // pop x:         push x is present/non-null
+	OpAnd                        // pop b,a:       push a && b
+	OpOr                         // pop b,a:       push a || b
+	OpNot                        // pop a:         push !a  (NOT / NOT IN / NOT LIKE)
 )
 
 // Instr is one instruction: an opcode plus a single operand (an index into one
