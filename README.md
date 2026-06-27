@@ -181,19 +181,24 @@ curl -s localhost:8080/match -d '{"uid":1,"age":28,"province":"广东","active_s
 .
 ├── main.go / cmd/api/main.go    # 入口（go run . / go run ./cmd/api）
 ├── pkg/                         # 公共库（可被外部项目 import）
-│   ├── engine/                  # 引擎装配、缓存、worker pool、统计、HTTP
+│   ├── api/                     # SPI：Parser / Runtime 接口 + Program(=ir.Node)
+│   ├── engine/                  # 引擎装配、缓存、worker pool、统计、HTTP、运营 API
 │   │   ├── engine.go  backend.go    # Engine/Matcher 接口 + Backend 抽象
-│   │   ├── backend_bytecode.go      # 默认：Frontend → IR → ByteCode → VM
-│   │   ├── backend_qlbridge.go      # 对照：qlbridge VM
-│   │   ├── frontend.go              # Frontend 接口 + NativeFrontend(自研 SQL)
-│   │   ├── frontend_qlbridge.go     # qlbridge AST → IR
-│   │   ├── frontend_json.go         # JSON Rule → IR
-│   │   ├── frontend_stub.go         # CEL / Expr 扩展点
-│   │   ├── cache.go workerpool.go statistics.go loader.go server.go reload.go
+│   │   ├── spi.go                   # Parser+Runtime → Backend 适配（NewWithParserRuntime）
+│   │   ├── manager.go               # 运营层：增/删/测试/发布/版本/回滚
+│   │   ├── server.go                # Fiber v3：打分 API + 运营 API + Web 编辑器
+│   │   ├── cache.go workerpool.go statistics.go loader.go reload.go
+│   ├── parser/                  # 插件化 Parser（统一输出 ir.Node）
+│   │   ├── qlbridge/ native/ json/  # 无额外依赖，开箱即用
+│   │   └── expr/ cel/ vitess/        # 需外部依赖（go mod tidy）；vitess 为占位
+│   ├── runtime/                 # 插件化 Runtime（执行 ir.Node）
+│   │   ├── bytecode/ ast/            # 完整实现（字节码 VM / 树遍历）
+│   │   └── cel/ expr/                # 占位（原生 VM 对照，待补依赖）
 │   ├── vm/                      # 字节码 VM（求值核心，换 parser 不用动）
 │   │   ├── opcode.go value.go compile.go vm.go
 │   ├── ir/                      # IR 类型 + 自研 SQL parser + 多 DSL 发射
 │   ├── model/                   # Rule / RuleProgram / User{UID,Fields} / Result
+│   ├── web/                     # 运营控制台（单文件 HTML 规则编辑器）
 │   └── dtable/                  # Decision Table 输入：行 → IR → SQL → 规则
 ├── internal/                    # 项目私有（不对外暴露）
 │   ├── cli/                     # CLI / demo 编排（RunCLI / Run / Serve / Export / Demo）
@@ -204,6 +209,37 @@ curl -s localhost:8080/match -d '{"uid":1,"age":28,"province":"广东","active_s
 ```
 
 ---
+
+## 🔌 插件化 Parser / Runtime（SPI）
+
+统一接口在 `pkg/api`：`Parser.Parse(rule) → Program(=ir.Node)`，`Runtime.Compile/Execute`。
+任意 Parser 与 Runtime 自由组合，引擎/缓存/worker pool 不变：
+
+```go
+import (
+    "github.com/example/rule-engine-demo/pkg/engine"
+    qp "github.com/example/rule-engine-demo/pkg/parser/qlbridge"
+    bc "github.com/example/rule-engine-demo/pkg/runtime/bytecode"
+)
+eng := engine.NewWithParserRuntime(qp.New(), bc.New()) // 解析↔执行 自由替换
+```
+
+可用 Parser：`qlbridge` `native` `json`（开箱即用）、`expr` `cel`（需 `go mod tidy`）、
+`vitess`（占位）。可用 Runtime：`bytecode` `ast`（完整）、`cel` `expr`（占位）。
+
+## 🖥 运营控制台（热更新 + 版本/回滚）
+
+`go run . -serve :8080` 后打开 <http://localhost:8080/>：在线编辑、**测试**、**发布（实时生效）**、
+**快照版本**、**回滚**。对应 HTTP API：
+
+```
+GET  /rules/list            POST /rules            DELETE /rules/:id     # 增删查（实时生效）
+POST /rules/test            # {"rule":"...","row":{...}} → {"matched":bool}
+POST /versions              POST /versions/:v/rollback                    # 快照 / 回滚
+```
+
+> `expr` / `cel` 解析器与 `expr` / `cel` runtime 依赖外部库（`github.com/expr-lang/expr`、
+> `github.com/google/cel-go`），已在 `go.mod` 声明 —— 首次使用请在本地执行 `go mod tidy`。
 
 ## 🗺 Roadmap
 

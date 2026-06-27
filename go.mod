@@ -4,7 +4,9 @@ go 1.26.4
 
 require (
 	github.com/araddon/qlbridge v0.0.0-20210503211017-dbc85609ca04
+	github.com/expr-lang/expr v1.16.9
 	github.com/gofiber/fiber/v3 v3.3.0
+	github.com/google/cel-go v0.21.0
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	go.uber.org/zap v1.28.0
 )
