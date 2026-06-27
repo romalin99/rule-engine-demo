@@ -24,7 +24,7 @@ SQL / 表达式 / CEL / JSON，统一编译成字节码，由一个自研 VM 对
 | 宽表用户 `map[string]any`（100–500 字段，无反射） | ✅ |
 | Worker Pool 批量匹配 + TPS/QPS/Latency | ✅ |
 | 多 DSL 互转（SQL↔Aviator↔CEL↔Expr） | ✅ |
-| 实时打分 HTTP 服务 | ✅ |
+| 实时打分 HTTP 服务（Fiber v3） | ✅ |
 | 热更新规则（增量 Add/Remove + 原子 Replace + 文件 Watcher） | ✅ |
 | Decision Table 输入（`dtable`：行→IR→SQL→规则） | ✅ 基础版 |
 | 后端 A/B 基准（自研 VM vs qlbridge VM） | ✅ |
@@ -157,7 +157,7 @@ go run . -gen-rules 1000000 -gen-users 1000000           # 百万级（需足够
 热更新 API（库内）：`AddRule` / `RemoveRule` 增量更新，`ReplaceRules` / `ReloadFromFile`
 原子全量替换；`engine.Watcher` 轮询规则文件变更自动热加载。
 
-后端 A/B 基准：`go test -bench=Backends ./benchmark/`（自研 VM vs qlbridge VM）。
+后端 A/B 基准：`go test -bench=Backends ./internal/benchmark/`（自研 VM vs qlbridge VM）。
 
 Decision Table（`dtable` 包）把决策表行编译成普通规则：
 
@@ -179,23 +179,26 @@ curl -s localhost:8080/match -d '{"uid":1,"age":28,"province":"广东","active_s
 
 ```
 .
-├── main.go / cmd/main.go        # 入口（go run . / go run ./cmd）
-├── engine/                      # 引擎装配、缓存、worker pool、统计、HTTP、CLI
-│   ├── engine.go  backend.go    # Engine/Matcher 接口 + Backend 抽象
-│   ├── backend_bytecode.go      # 默认：Frontend → IR → ByteCode → VM
-│   ├── backend_qlbridge.go      # 对照：qlbridge VM
-│   ├── frontend.go              # Frontend 接口 + NativeFrontend(自研 SQL)
-│   ├── frontend_qlbridge.go     # qlbridge AST → IR
-│   ├── frontend_json.go         # JSON Rule → IR
-│   ├── frontend_stub.go         # CEL / Expr 扩展点
-│   ├── cache.go workerpool.go statistics.go loader.go server.go benchmark.go
-├── vm/                          # 字节码 VM（求值核心，换 parser 不用动）
-│   ├── opcode.go value.go compile.go vm.go
-├── ir/                          # IR 类型 + 自研 SQL parser + 多 DSL 发射
-├── model/                       # Rule / RuleProgram / User{UID,Fields} / Result
-├── dtable/                      # Decision Table 输入：行 → IR → SQL → 规则
-├── datasource/                  # UserStore + 确定性数据生成
-├── benchmark/                   # go test -bench（TPS/QPS/Latency、worker 扩展性）
+├── main.go / cmd/api/main.go    # 入口（go run . / go run ./cmd/api）
+├── pkg/                         # 公共库（可被外部项目 import）
+│   ├── engine/                  # 引擎装配、缓存、worker pool、统计、HTTP
+│   │   ├── engine.go  backend.go    # Engine/Matcher 接口 + Backend 抽象
+│   │   ├── backend_bytecode.go      # 默认：Frontend → IR → ByteCode → VM
+│   │   ├── backend_qlbridge.go      # 对照：qlbridge VM
+│   │   ├── frontend.go              # Frontend 接口 + NativeFrontend(自研 SQL)
+│   │   ├── frontend_qlbridge.go     # qlbridge AST → IR
+│   │   ├── frontend_json.go         # JSON Rule → IR
+│   │   ├── frontend_stub.go         # CEL / Expr 扩展点
+│   │   ├── cache.go workerpool.go statistics.go loader.go server.go reload.go
+│   ├── vm/                      # 字节码 VM（求值核心，换 parser 不用动）
+│   │   ├── opcode.go value.go compile.go vm.go
+│   ├── ir/                      # IR 类型 + 自研 SQL parser + 多 DSL 发射
+│   ├── model/                   # Rule / RuleProgram / User{UID,Fields} / Result
+│   └── dtable/                  # Decision Table 输入：行 → IR → SQL → 规则
+├── internal/                    # 项目私有（不对外暴露）
+│   ├── cli/                     # CLI / demo 编排（RunCLI / Run / Serve / Export / Demo）
+│   ├── datasource/              # UserStore + 确定性数据生成
+│   └── benchmark/               # go test -bench（TPS/QPS/Latency、worker 扩展性）
 ├── examples/quickstart/         # 库用法示例
 └── data/                        # rules.json / users.json / rules_json.json / functions.json
 ```

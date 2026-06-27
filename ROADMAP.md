@@ -30,7 +30,7 @@ input, one IR, one bytecode VM, wide-table batch matching.
 - [x] AST/IR → ByteCode compiler (`vm` package)
 - [x] Stack VM over `map[string]any` (zero-alloc, concurrency-safe)
 - [x] `Backend` abstraction: bytecode VM vs qlbridge VM (A/B benchmark)
-- [x] Throughput comparison: bytecode vs qlbridge (`benchmark/compare_test.go`)
+- [x] Throughput comparison: bytecode vs qlbridge (`internal/benchmark/compare_test.go`)
 - [ ] Comparison vs CEL / expr (needs those front-ends)
 - [ ] Short-circuit jumps (`JMP_IF_FALSE`/`JMP_IF_TRUE`)
 - [ ] Constant folding / predicate dedup across rules

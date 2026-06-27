@@ -14,7 +14,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: '1.26.4'
           cache: true
 
       - name: Download modules
@@ -30,4 +30,4 @@ jobs:
         run: go test -race ./...
 
       - name: Benchmark (smoke)
-        run: go test -bench=BenchmarkMatchUser -benchtime=10x ./benchmark/
+        run: go test -bench=BenchmarkMatchUser -benchtime=10x ./internal/benchmark/

@@ -6,9 +6,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/example/rule-engine-demo/engine"
-	"github.com/example/rule-engine-demo/ir"
-	"github.com/example/rule-engine-demo/model"
+	"github.com/example/rule-engine-demo/pkg/engine"
+	"github.com/example/rule-engine-demo/pkg/ir"
+	"github.com/example/rule-engine-demo/pkg/model"
 )
 
 func main() {

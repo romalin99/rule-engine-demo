@@ -15,8 +15,8 @@
 //	go run . -demo                                            # named 5-rule demo
 package main
 
-import "github.com/example/rule-engine-demo/engine"
+import "github.com/example/rule-engine-demo/internal/cli"
 
 func main() {
-	engine.RunCLI()
+	cli.RunCLI()
 }
