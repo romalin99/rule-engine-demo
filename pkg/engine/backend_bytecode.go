@@ -1,8 +1,8 @@
 package engine
 
 import (
-	"github.com/example/rule-engine-demo/pkg/ir"
-	"github.com/example/rule-engine-demo/pkg/vm"
+	"tcg-rulex-engine/pkg/ir"
+	"tcg-rulex-engine/pkg/vm"
 )
 
 // BytecodeBackend is the 2026-style backend: a pluggable Frontend parses rules

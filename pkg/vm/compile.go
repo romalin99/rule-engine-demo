@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/example/rule-engine-demo/pkg/ir"
+	"tcg-rulex-engine/pkg/ir"
 )
 
 // Compile lowers an IR tree into bytecode. It is called once per rule at load

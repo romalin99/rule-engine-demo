@@ -13,7 +13,7 @@ package parser
 import (
 	"sort"
 
-	"github.com/example/rule-engine-demo/pkg/api"
+	"tcg-rulex-engine/pkg/api"
 )
 
 // Parser turns rule text into a Program (unified IR). Alias of api.Parser.

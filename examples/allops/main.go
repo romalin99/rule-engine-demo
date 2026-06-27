@@ -10,11 +10,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/example/rule-engine-demo/pkg/engine"
-	"github.com/example/rule-engine-demo/pkg/ir"
-	"github.com/example/rule-engine-demo/pkg/model"
-	astrt "github.com/example/rule-engine-demo/pkg/runtime/ast"
-	"github.com/example/rule-engine-demo/pkg/vm"
+	"tcg-rulex-engine/pkg/engine"
+	"tcg-rulex-engine/pkg/ir"
+	"tcg-rulex-engine/pkg/model"
+	astrt "tcg-rulex-engine/pkg/runtime/ast"
+	"tcg-rulex-engine/pkg/vm"
 )
 
 // flagship covers: = <> > >= < <= BETWEEN IN NOT IN LIKE NOT LIKE

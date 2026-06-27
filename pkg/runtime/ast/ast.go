@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/example/rule-engine-demo/pkg/api"
-	"github.com/example/rule-engine-demo/pkg/ir"
+	"tcg-rulex-engine/pkg/api"
+	"tcg-rulex-engine/pkg/ir"
 )
 
 // Runtime implements api.Runtime by walking the IR tree.

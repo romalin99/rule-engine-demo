@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/model"
 )
 
 // Domain value pools used by both the user generator and the rule generator so

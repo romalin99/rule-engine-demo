@@ -1,9 +1,9 @@
 package engine
 
 import (
-	"github.com/example/rule-engine-demo/pkg/ir"
-	celparser "github.com/example/rule-engine-demo/pkg/parser/cel"
-	exprparser "github.com/example/rule-engine-demo/pkg/parser/expr"
+	"tcg-rulex-engine/pkg/ir"
+	celparser "tcg-rulex-engine/pkg/parser/cel"
+	exprparser "tcg-rulex-engine/pkg/parser/expr"
 )
 
 // CEL and Expr front-ends. The actual rule-text → ir.Node conversion lives in

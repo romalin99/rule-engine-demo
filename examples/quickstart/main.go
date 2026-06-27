@@ -6,9 +6,9 @@ package main
 import (
 	"fmt"
 
-	"github.com/example/rule-engine-demo/pkg/engine"
-	"github.com/example/rule-engine-demo/pkg/ir"
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/engine"
+	"tcg-rulex-engine/pkg/ir"
+	"tcg-rulex-engine/pkg/model"
 )
 
 func main() {

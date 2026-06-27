@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/model"
 )
 
 // LoadRules reads and unmarshals a rules JSON file.

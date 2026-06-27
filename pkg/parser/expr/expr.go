@@ -24,8 +24,8 @@ import (
 	exprast "github.com/expr-lang/expr/ast"
 	exprparser "github.com/expr-lang/expr/parser"
 
-	"github.com/example/rule-engine-demo/pkg/api"
-	"github.com/example/rule-engine-demo/pkg/ir"
+	"tcg-rulex-engine/pkg/api"
+	"tcg-rulex-engine/pkg/ir"
 )
 
 // Parser implements api.Parser using the expr-lang parser.

@@ -4,8 +4,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/example/rule-engine-demo/pkg/engine"
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/engine"
+	"tcg-rulex-engine/pkg/model"
 )
 
 func namedRules() []model.Rule {

@@ -17,7 +17,7 @@ package vitess
 import (
 	"fmt"
 
-	"github.com/example/rule-engine-demo/pkg/api"
+	"tcg-rulex-engine/pkg/api"
 )
 
 // Parser implements api.Parser via Vitess (not yet implemented).

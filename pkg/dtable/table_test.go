@@ -3,9 +3,9 @@ package dtable_test
 import (
 	"testing"
 
-	"github.com/example/rule-engine-demo/pkg/dtable"
-	"github.com/example/rule-engine-demo/pkg/engine"
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/dtable"
+	"tcg-rulex-engine/pkg/engine"
+	"tcg-rulex-engine/pkg/model"
 )
 
 func TestDecisionTableCompilesAndMatches(t *testing.T) {

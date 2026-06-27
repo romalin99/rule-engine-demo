@@ -3,8 +3,8 @@ package vm
 import (
 	"testing"
 
-	"github.com/example/rule-engine-demo/pkg/ir"
-	astrt "github.com/example/rule-engine-demo/pkg/runtime/ast"
+	"tcg-rulex-engine/pkg/ir"
+	astrt "tcg-rulex-engine/pkg/runtime/ast"
 )
 
 func TestCompileAndEval(t *testing.T) {

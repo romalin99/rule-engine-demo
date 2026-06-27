@@ -13,7 +13,7 @@ package engine
 import (
 	"fmt"
 
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/model"
 )
 
 // Matcher is the engine interface used by callers (HTTP server, batch jobs, ...).

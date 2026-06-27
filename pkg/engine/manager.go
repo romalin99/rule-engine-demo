@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/model"
 )
 
 // Manager is the operations layer (step 11): it holds the authoritative,

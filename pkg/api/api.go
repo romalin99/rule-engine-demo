@@ -13,7 +13,7 @@
 // language or evaluator.
 package api
 
-import "github.com/example/rule-engine-demo/pkg/ir"
+import "tcg-rulex-engine/pkg/ir"
 
 // Program is a parsed rule in the project's unified IR. A Parser produces it and
 // a Runtime consumes it. It is exactly ir.Node (step 4: the IR is the program),

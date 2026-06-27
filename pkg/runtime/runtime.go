@@ -10,7 +10,7 @@ package runtime
 import (
 	"sort"
 
-	"github.com/example/rule-engine-demo/pkg/api"
+	"tcg-rulex-engine/pkg/api"
 )
 
 // Runtime compiles and executes Programs. Alias of api.Runtime.

@@ -1,6 +1,6 @@
 // Package web holds the static operations console (step 11): a single-file rule
 // editor that talks to the engine's HTTP API to edit, test, publish, list and
-// roll back rules. It is served at GET "/" by engine.Serve.
+// roll back rules. It is served at GET "/" by router.Serve.
 package web
 
 // Page is the self-contained rule-editor HTML (no external assets).

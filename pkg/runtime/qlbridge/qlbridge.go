@@ -16,8 +16,8 @@ import (
 	"github.com/araddon/qlbridge/value"
 	qlvm "github.com/araddon/qlbridge/vm"
 
-	"github.com/example/rule-engine-demo/pkg/api"
-	"github.com/example/rule-engine-demo/pkg/ir"
+	"tcg-rulex-engine/pkg/api"
+	"tcg-rulex-engine/pkg/ir"
 )
 
 var builtinsOnce sync.Once

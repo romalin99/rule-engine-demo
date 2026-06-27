@@ -17,9 +17,9 @@ import (
 	"fmt"
 	"testing"
 
-	ds "github.com/example/rule-engine-demo/internal/datasource"
-	"github.com/example/rule-engine-demo/pkg/engine"
-	"github.com/example/rule-engine-demo/pkg/model"
+	ds "tcg-rulex-engine/internal/datasource"
+	"tcg-rulex-engine/pkg/engine"
+	"tcg-rulex-engine/pkg/model"
 )
 
 const (

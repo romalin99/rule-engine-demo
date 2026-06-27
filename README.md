@@ -211,12 +211,11 @@ curl -s localhost:8080/match -d '{"uid":1,"age":28,"province":"广东","active_s
 ├── main.go / cmd/api/main.go    # 入口（go run . / go run ./cmd/api）
 ├── pkg/                         # 公共库（可被外部项目 import）
 │   ├── api/                     # SPI：Parser / Runtime 接口 + Program(=ir.Node)
-│   ├── engine/                  # 引擎装配、缓存、worker pool、统计、HTTP、运营 API
+│   ├── engine/                  # 引擎装配、缓存、worker pool、统计、运营 API
 │   │   ├── engine.go  backend.go    # Engine/Matcher 接口 + Backend 抽象
 │   │   ├── spi.go                   # Parser+Runtime → Backend 适配（NewWithParserRuntime）
 │   │   ├── manager.go               # 运营层：增/删/测试/发布/版本/回滚
-│   │   ├── server.go                # Fiber v3：打分 API + 运营 API + Web 编辑器
-│   │   ├── cache.go workerpool.go statistics.go loader.go reload.go
+│   │   ├── cache.go workerpool.go statistics.go loader.go reload.go limiter.go
 │   ├── parser/                  # 插件化 Parser（统一输出 ir.Node）
 │   │   ├── qlbridge/ native/ json/  # 无额外依赖，开箱即用
 │   │   └── expr/ cel/ vitess/        # 需外部依赖（go mod tidy）；vitess 为占位
@@ -231,10 +230,12 @@ curl -s localhost:8080/match -d '{"uid":1,"age":28,"province":"广东","active_s
 │   └── dtable/                  # Decision Table 输入：行 → IR → SQL → 规则
 ├── internal/                    # 项目私有（不对外暴露）
 │   ├── cli/                     # CLI / demo 编排（RunCLI / Run / Serve / Export / Demo）
+│   ├── router/                  # Fiber v3 HTTP 路由：打分 API + 运营 API + Web 编辑器（routes.go）
 │   ├── datasource/              # UserStore + 确定性数据生成
 │   └── benchmark/               # go test -bench（TPS/QPS/Latency、worker 扩展性）
 ├── examples/quickstart/         # 库用法示例
-└── data/                        # rules.json / users.json / rules_json.json / functions.json
+├── examples/allops/             # 全算子覆盖示例（解析→IR→VM/AST→多 DSL）
+└── data/                        # rules.json / users.json / rules_json*.json / functions.json
 ```
 
 ---
@@ -246,9 +247,9 @@ curl -s localhost:8080/match -d '{"uid":1,"age":28,"province":"广东","active_s
 
 ```go
 import (
-    "github.com/example/rule-engine-demo/pkg/engine"
-    qp "github.com/example/rule-engine-demo/pkg/parser/qlbridge"
-    bc "github.com/example/rule-engine-demo/pkg/runtime/bytecode"
+    "tcg-rulex-engine/pkg/engine"
+    qp "tcg-rulex-engine/pkg/parser/qlbridge"
+    bc "tcg-rulex-engine/pkg/runtime/bytecode"
 )
 eng := engine.NewWithParserRuntime(qp.New(), bc.New()) // 解析↔执行 自由替换
 ```

@@ -15,7 +15,7 @@
 //	go run . -demo                                            # named 5-rule demo
 package main
 
-import "github.com/example/rule-engine-demo/internal/cli"
+import "tcg-rulex-engine/internal/cli"
 
 func main() {
 	cli.RunCLI()

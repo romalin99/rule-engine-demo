@@ -4,7 +4,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/model"
 )
 
 // RuleCache is the compiled-rule store.

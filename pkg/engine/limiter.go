@@ -1,6 +1,6 @@
 package engine
 
-import "github.com/example/rule-engine-demo/pkg/model"
+import "tcg-rulex-engine/pkg/model"
 
 // MaxConcurrentUsers caps how many users may participate in rule judgment at the
 // same time (Phase 5 / v0.5.0). It bounds both batch worker fan-out

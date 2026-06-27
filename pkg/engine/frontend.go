@@ -1,6 +1,6 @@
 package engine
 
-import "github.com/example/rule-engine-demo/pkg/ir"
+import "tcg-rulex-engine/pkg/ir"
 
 // Frontend is a pluggable rule parser. It turns rule text into the shared IR.
 // The VM/back-end never depends on which Frontend produced the IR, so you can

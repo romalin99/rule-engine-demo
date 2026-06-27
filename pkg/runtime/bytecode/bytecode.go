@@ -8,9 +8,9 @@ package bytecode
 import (
 	"fmt"
 
-	"github.com/example/rule-engine-demo/pkg/api"
-	"github.com/example/rule-engine-demo/pkg/ir"
-	"github.com/example/rule-engine-demo/pkg/vm"
+	"tcg-rulex-engine/pkg/api"
+	"tcg-rulex-engine/pkg/ir"
+	"tcg-rulex-engine/pkg/vm"
 )
 
 // Runtime implements api.Runtime over the custom bytecode VM.

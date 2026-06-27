@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/example/rule-engine-demo/pkg/ir"
+	"tcg-rulex-engine/pkg/ir"
 )
 
 // JSONFrontend parses a JSON rule document into the shared IR. This gives a

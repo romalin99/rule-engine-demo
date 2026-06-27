@@ -1,6 +1,6 @@
 package engine
 
-import "github.com/example/rule-engine-demo/pkg/api"
+import "tcg-rulex-engine/pkg/api"
 
 // This file exposes the canonical Parser / Runtime SPI (steps 2–3) on the engine
 // and adapts a Parser+Runtime pair onto the existing Backend machinery, so the
@@ -12,8 +12,8 @@ import "github.com/example/rule-engine-demo/pkg/api"
 // pair with NewWithParserRuntime, e.g.:
 //
 //	import (
-//	    qp "github.com/example/rule-engine-demo/pkg/parser/qlbridge"
-//	    bc "github.com/example/rule-engine-demo/pkg/runtime/bytecode"
+//	    qp "tcg-rulex-engine/pkg/parser/qlbridge"
+//	    bc "tcg-rulex-engine/pkg/runtime/bytecode"
 //	)
 //	eng := engine.NewWithParserRuntime(qp.New(), bc.New())
 

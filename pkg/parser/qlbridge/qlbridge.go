@@ -20,8 +20,8 @@ import (
 	"github.com/araddon/qlbridge/lex"
 	"github.com/araddon/qlbridge/value"
 
-	"github.com/example/rule-engine-demo/pkg/api"
-	"github.com/example/rule-engine-demo/pkg/ir"
+	"tcg-rulex-engine/pkg/api"
+	"tcg-rulex-engine/pkg/ir"
 )
 
 // Parser implements api.Parser by parsing with qlbridge and lowering to IR.

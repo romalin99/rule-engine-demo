@@ -8,10 +8,11 @@ import (
 	"strings"
 	"time"
 
-	ds "github.com/example/rule-engine-demo/internal/datasource"
-	"github.com/example/rule-engine-demo/pkg/engine"
-	"github.com/example/rule-engine-demo/pkg/ir"
-	"github.com/example/rule-engine-demo/pkg/model"
+	ds "tcg-rulex-engine/internal/datasource"
+	"tcg-rulex-engine/internal/router"
+	"tcg-rulex-engine/pkg/engine"
+	"tcg-rulex-engine/pkg/ir"
+	"tcg-rulex-engine/pkg/model"
 )
 
 // Config controls a benchmark/match run.
@@ -128,7 +129,7 @@ func RunServer(cfg Config) error {
 		go func() { _ = w.Run(context.Background()) }()
 		fmt.Printf("watching %s for changes (hot reload)\n", cfg.RulesFile)
 	}
-	return engine.Serve(cfg.Serve, eng)
+	return router.Serve(cfg.Serve, eng)
 }
 
 // RunExport loads rules and prints each one converted to the requested DSL
