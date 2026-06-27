@@ -12,24 +12,23 @@ SQL / 表达式 / CEL / JSON，统一编译成字节码，由一个自研 VM 对
 
 ## ✨ Features
 
-| 能力                                                                       | 状态                                |
-| -------------------------------------------------------------------------- | ----------------------------------- |
-| DSL 输入：SQL(qlbridge)、SQL(自研)、JSON Rule                              | ✅                                  |
-| DSL 输入：CEL（cel-go）、Expr（expr-lang）                                | ✅（`frontend_cel.go` / `frontend_expr.go`） |
-| 算子：`= != > >= < <=`、`BETWEEN`、`IN`、`LIKE`、`AND/OR`、`IS [NOT] NULL` | ✅                                  |
-| 统一 IR（`ir` 包）                                                         | ✅                                  |
-| 自研字节码 VM（`vm` 包，零分配、并发安全）                                 | ✅                                  |
-| 可插拔后端：自研 VM ↔ qlbridge VM（可对比吞吐）                            | ✅                                  |
-| 规则缓存 `sync.Map`（10 万规则）                                           | ✅                                  |
-| 宽表用户 `map[string]any`（100–500 字段，无反射）                          | ✅                                  |
-| Worker Pool 批量匹配 + TPS/QPS/Latency                                     | ✅                                  |
-| 多 DSL 互转（SQL↔Aviator↔CEL↔Expr）                                        | ✅                                  |
-| 实时打分 gofiber 服务                                                      | ✅                                  |
-| 热更新规则（增量 Add/Remove + 原子 Replace + 文件 Watcher）                | ✅                                  |
-| 运营平台 Web 控制台（编辑/测试/发布/版本/回滚，`/admin`）                  | ✅（`engine/admin.go`，`-admin`）   |
-| Decision Table 输入（`dtable`：行→IR→SQL→规则）                            | ✅ 基础版                           |
-| 后端 A/B 基准（自研 VM vs qlbridge VM）                                    | ✅                                  |
-| struct / Arrow 列式输入                                                    | ⏳ Roadmap                          |
+| 能力 | 状态 |
+|------|------|
+| DSL 输入：SQL(qlbridge)、SQL(自研)、JSON Rule | ✅ |
+| DSL 输入：CEL、Expr | 🔶 扩展点已留（`frontend_stub.go`） |
+| 算子：`= != > >= < <=`、`BETWEEN`、`IN`、`LIKE`、`AND/OR`、`IS [NOT] NULL` | ✅ |
+| 统一 IR（`ir` 包） | ✅ |
+| 自研字节码 VM（`vm` 包，零分配、并发安全） | ✅ |
+| 可插拔后端：自研 VM ↔ qlbridge VM（可对比吞吐） | ✅ |
+| 规则缓存 `sync.Map`（10 万规则） | ✅ |
+| 宽表用户 `map[string]any`（100–500 字段，无反射） | ✅ |
+| Worker Pool 批量匹配 + TPS/QPS/Latency | ✅ |
+| 多 DSL 互转（SQL↔Aviator↔CEL↔Expr） | ✅ |
+| 实时打分 HTTP 服务 | ✅ |
+| 热更新规则（增量 Add/Remove + 原子 Replace + 文件 Watcher） | ✅ |
+| Decision Table 输入（`dtable`：行→IR→SQL→规则） | ✅ 基础版 |
+| 后端 A/B 基准（自研 VM vs qlbridge VM） | ✅ |
+| struct / Arrow 列式输入 | ⏳ Roadmap |
 
 完整规划见 [ROADMAP.md](ROADMAP.md)。
 
@@ -118,14 +117,12 @@ engine.NewWithBackend(engine.NewBytecodeBackend(engine.JSONFrontend{}))   // JSO
 JSON Rule 示例（见 `data/rules_json.json`）：
 
 ```json
-{
-  "and": [
-    { "field": "age", "op": "between", "values": [25, 40] },
-    { "field": "province", "op": "in", "values": ["广东", "江苏"] },
-    { "field": "favorite_category", "op": "like", "value": "数%" },
-    { "field": "active_score", "op": ">=", "value": 85 }
-  ]
-}
+{ "and": [
+  {"field":"age","op":"between","values":[25,40]},
+  {"field":"province","op":"in","values":["广东","江苏"]},
+  {"field":"favorite_category","op":"like","value":"数%"},
+  {"field":"active_score","op":">=","value":85}
+]}
 ```
 
 ---
