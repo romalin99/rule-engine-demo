@@ -28,6 +28,7 @@ type Config struct {
 	Backend   string // "bytecode" (custom VM) or "qlbridge" (qlbridge VM)
 	Frontend  string // bytecode parser front-end: "qlbridge" or "native"
 	Watch     bool   // with -serve + -rules: hot-reload the rules file on change
+	Admin     bool   // with -serve: also mount the /admin operations console
 }
 
 // DefaultConfig returns the out-of-the-box configuration used by `go run .`.
@@ -83,8 +84,9 @@ func RunCLI() {
 	flag.StringVar(&cfg.Serve, "serve", "", "serve HTTP scoring API on this addr, e.g. :8080")
 	flag.StringVar(&cfg.Export, "export", "", "convert rules to DSL (sql|aviator|cel|expr) and exit")
 	flag.StringVar(&cfg.Backend, "backend", cfg.Backend, "evaluation backend: bytecode|qlbridge")
-	flag.StringVar(&cfg.Frontend, "frontend", cfg.Frontend, "bytecode parser front-end: qlbridge|native|json")
+	flag.StringVar(&cfg.Frontend, "frontend", cfg.Frontend, "bytecode parser front-end: qlbridge|native|json|cel|expr")
 	flag.BoolVar(&cfg.Watch, "watch", false, "with -serve -rules: hot-reload rules file on change")
+	flag.BoolVar(&cfg.Admin, "admin", false, "with -serve: mount the /admin operations console (rule editor/test/publish/rollback)")
 	flag.Parse()
 
 	if cfg.Demo {
@@ -126,6 +128,13 @@ func RunServer(cfg Config) error {
 		w := NewWatcher(eng, cfg.RulesFile, 2*time.Second)
 		go func() { _ = w.Run(context.Background()) }()
 		fmt.Printf("watching %s for changes (hot reload)\n", cfg.RulesFile)
+	}
+
+	if cfg.Admin {
+		// LoadRules already populated the cache above; the store seeds version 1
+		// from the same rule set and owns subsequent hot reloads via the console.
+		store := NewRuleStore(eng, rules)
+		return ServeWithStore(cfg.Serve, eng, store)
 	}
 	return Serve(cfg.Serve, eng)
 }
