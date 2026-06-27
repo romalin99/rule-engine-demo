@@ -114,7 +114,16 @@ func RunCLI() {
 
 // RunServer loads rules (from file or generated) and serves the HTTP API.
 func RunServer(cfg Config) error {
-	eng := newEngine(cfg)
+	// Serving uses the native SQL front-end + bytecode VM so the live rule API
+	// (/rules, /rules/selftest, /evaluate) accepts the full operator set,
+	// including NOT IN / NOT LIKE / NOT (...). (-backend qlbridge still selects
+	// the qlbridge VM for A/B comparison.)
+	var eng *engine.Engine
+	if cfg.Backend == "qlbridge" {
+		eng = engine.NewWithBackend(engine.NewQLBridgeBackend())
+	} else {
+		eng = engine.NewWithBackend(engine.NewBytecodeBackend(engine.NativeFrontend{}))
+	}
 	gen := ds.NewGenerator(cfg.Seed)
 	rules, err := loadOrGenRules(cfg, gen)
 	if err != nil {

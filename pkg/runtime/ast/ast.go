@@ -243,3 +243,106 @@ func litString(v ir.Value) string {
 	}
 	return v.Num
 }
+
+// Reason explains why one predicate or sub-expression failed during Explain.
+type Reason struct {
+	Expr   string `json:"expr"`   // the failing predicate / group, in SQL form
+	Detail string `json:"detail"` // human-readable cause, including the actual value
+}
+
+// Explain evaluates n against row and, when it does not pass, returns the
+// predicates responsible. It uses the same semantics as Execute (and therefore
+// the bytecode VM), so `passed` always matches a normal match; when passed is
+// true the reasons slice is empty.
+//
+//   - AND  : reports every failing child.
+//   - OR   : reports a single reason when no alternative held.
+//   - NOT  : reports a reason when the negated condition was satisfied.
+//   - leaf : reports a value-aware reason (field=value vs the operator).
+func Explain(n ir.Node, row map[string]any) (passed bool, reasons []Reason) {
+	switch t := n.(type) {
+	case ir.Logic:
+		if t.Op == "OR" {
+			var details []string
+			for _, a := range t.Args {
+				ok, rs := Explain(a, row)
+				if ok {
+					return true, nil // one alternative held -> OR passes
+				}
+				for _, r := range rs {
+					details = append(details, r.Detail)
+				}
+			}
+			return false, []Reason{{
+				Expr:   ir.Emit(t, ir.SQL),
+				Detail: "no OR alternative held — " + strings.Join(details, "; "),
+			}}
+		}
+		// AND: every child must pass; collect all failures.
+		var rs []Reason
+		for _, a := range t.Args {
+			if ok, r := Explain(a, row); !ok {
+				rs = append(rs, r...)
+			}
+		}
+		return len(rs) == 0, rs
+
+	case ir.Not:
+		if inner, _ := eval(t.Arg, row); !inner {
+			return true, nil // inner condition failed -> NOT passes
+		}
+		return false, []Reason{{
+			Expr:   ir.Emit(t, ir.SQL),
+			Detail: "the negated condition was satisfied",
+		}}
+
+	default: // leaf predicate
+		if ok, _ := eval(n, row); ok {
+			return true, nil
+		}
+		return false, []Reason{{Expr: ir.Emit(n, ir.SQL), Detail: describeLeaf(n, row)}}
+	}
+}
+
+// describeLeaf renders why a leaf predicate failed, including the row's value.
+func describeLeaf(n ir.Node, row map[string]any) string {
+	switch t := n.(type) {
+	case ir.Compare:
+		return fmt.Sprintf("%s=%s does not satisfy %s %s", t.Field, fieldRepr(row, t.Field), t.Op, litRepr(t.Val))
+	case ir.Between:
+		return fmt.Sprintf("%s=%s is outside [%s, %s]", t.Field, fieldRepr(row, t.Field), litRepr(t.Lo), litRepr(t.Hi))
+	case ir.In:
+		if t.Negate {
+			return fmt.Sprintf("%s=%s is in the excluded set", t.Field, fieldRepr(row, t.Field))
+		}
+		return fmt.Sprintf("%s=%s is not in the allowed set", t.Field, fieldRepr(row, t.Field))
+	case ir.Like:
+		if t.Negate {
+			return fmt.Sprintf("%s=%s matches the excluded pattern '%s'", t.Field, fieldRepr(row, t.Field), t.Pattern)
+		}
+		return fmt.Sprintf("%s=%s does not match pattern '%s'", t.Field, fieldRepr(row, t.Field), t.Pattern)
+	case ir.IsNull:
+		if t.Negate {
+			return fmt.Sprintf("%s is missing or null (IS NOT NULL required)", t.Field)
+		}
+		return fmt.Sprintf("%s=%s is present but IS NULL required", t.Field, fieldRepr(row, t.Field))
+	}
+	return "condition not satisfied"
+}
+
+// fieldRepr renders a row field for messages; missing/nil becomes <null>.
+func fieldRepr(row map[string]any, field string) string {
+	v, ok := row[field]
+	if !ok || v == nil {
+		return "<null>"
+	}
+	return asString(v)
+}
+
+// litRepr renders an IR literal: quoted when it is a string.
+func litRepr(v ir.Value) string {
+	if v.IsString {
+		return "'" + v.Str + "'"
+	}
+	return v.Num
+}

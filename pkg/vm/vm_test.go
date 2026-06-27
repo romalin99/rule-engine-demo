@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"strings"
 	"testing"
 
 	"tcg-rulex-engine/pkg/ir"
@@ -231,6 +232,62 @@ func TestASTMatchesBytecode(t *testing.T) {
 			if bc != a {
 				t.Errorf("disagree on %q\n row=%v\n bytecode=%v ast=%v", r, row, bc, a)
 			}
+		}
+	}
+}
+
+// TestExplain checks the explainable evaluator backing POST /evaluate: a passing
+// row yields no reasons; a failing row reports the specific failing predicates.
+func TestExplain(t *testing.T) {
+	const flagship = "age BETWEEN 25 AND 40 " +
+		"AND province IN ('广东','江苏','浙江') " +
+		"AND income_level NOT IN ('<5k','5k-10k') " +
+		"AND favorite_category LIKE '数%' " +
+		"AND occupation NOT LIKE '%学生%' " +
+		"AND active_score >= 85 " +
+		"AND credit_score BETWEEN 700 AND 850 " +
+		"AND total_amount > 5000 " +
+		"AND avg_order_amount <= 1000 " +
+		"AND last_login_time IS NOT NULL " +
+		"AND (vip_level >= 3 OR order_count >= 30) " +
+		"AND NOT (risk_level = '高') " +
+		"AND register_days >= 180 " +
+		"AND marital_status <> '未知'"
+
+	node, err := ir.Parse(flagship)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+
+	match := map[string]any{
+		"age": 32, "province": "江苏", "income_level": "20k-30k",
+		"favorite_category": "数码", "occupation": "工程师", "active_score": 90.5,
+		"credit_score": 760, "total_amount": 22000.0, "avg_order_amount": 366.67,
+		"last_login_time": "2026-06-26 21:15:00", "vip_level": 4, "order_count": 60,
+		"risk_level": "低", "register_days": 400, "marital_status": "已婚",
+	}
+	if passed, reasons := astrt.Explain(node, match); !passed || len(reasons) != 0 {
+		t.Errorf("match row: passed=%v reasons=%v; want passed=true, no reasons", passed, reasons)
+	}
+
+	miss := map[string]any{ // breaks several clauses incl. the negations
+		"age": 21, "province": "江苏", "income_level": "<5k",
+		"favorite_category": "图书", "occupation": "在校学生", "active_score": 70.0,
+		"credit_score": 660, "total_amount": 1000.0, "avg_order_amount": 1500.0,
+		"vip_level": 1, "order_count": 3, "risk_level": "高",
+		"register_days": 30, "marital_status": "未知",
+	}
+	passed, reasons := astrt.Explain(node, miss)
+	if passed || len(reasons) == 0 {
+		t.Fatalf("miss row: passed=%v reasons=%d; want passed=false with reasons", passed, len(reasons))
+	}
+	var joined string
+	for _, r := range reasons {
+		joined += r.Expr + " — " + r.Detail + "\n"
+	}
+	for _, want := range []string{"age BETWEEN", "income_level NOT IN", "occupation NOT LIKE", "last_login_time IS NOT NULL", "NOT (risk_level"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("reasons missing %q; got:\n%s", want, joined)
 		}
 	}
 }

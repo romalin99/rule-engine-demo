@@ -265,7 +265,47 @@ eng := engine.NewWithParserRuntime(qp.New(), bc.New()) // 解析↔执行 自由
 ```
 GET  /rules/list            POST /rules            DELETE /rules/:id     # 增删查（实时生效）
 POST /rules/test            # {"rule":"...","row":{...}} → {"matched":bool}
+POST /rules/selftest        # 复杂规则“加→命中→删”实时生效自检（见下）
+POST /evaluate              # 宽表用户 → {passed, reasons[]}（见下）
 POST /versions              POST /versions/:v/rollback                    # 快照 / 回滚
+```
+
+> `-serve` 默认走原生 SQL 前端，支持全部算子（含 `NOT IN`/`NOT LIKE`/`NOT(...)`），
+> 因此上述实时增删与 `/evaluate` 可直接使用旗舰规则。
+
+### POST /evaluate — 是否通过规则树 + 未通过原因
+
+传入宽表用户数据，返回是否通过某条规则树；未通过时逐条给出失败原因（含实际取值）。
+缺省评估全算子旗舰规则，也可传 `rule`（SQL）或已加载规则的 `rule_id`：
+
+```bash
+curl -s localhost:8080/evaluate -H 'Content-Type: application/json' -d '{
+  "row": {"age":21,"province":"江苏","income_level":"<5k","favorite_category":"图书",
+          "occupation":"在校学生","active_score":70,"credit_score":660,
+          "risk_level":"高","marital_status":"未知"}
+}'
+# -> {"passed":false,"reasons":[
+#      {"expr":"age BETWEEN 25 AND 40","detail":"age=21 is outside [25, 40]"},
+#      {"expr":"income_level NOT IN ('<5k', '5k-10k')","detail":"income_level=<5k is in the excluded set"},
+#      {"expr":"occupation NOT LIKE '%学生%'","detail":"occupation=在校学生 matches the excluded pattern '%学生%'"},
+#      {"expr":"last_login_time IS NOT NULL","detail":"last_login_time is missing or null (IS NOT NULL required)"},
+#      {"expr":"NOT (risk_level = '高')","detail":"the negated condition was satisfied"}, ... ],
+#     "rule":"age BETWEEN 25 AND 40 AND ..."}
+```
+
+通过时 `passed=true` 且 `reasons` 为空数组。
+
+### POST /rules/selftest — 复杂规则热更新自检
+
+验证“添加一条复杂规则 + 删除规则”实时生效：对样本用户先打分、加规则后再打分（应命中）、
+删规则后再打分（命中消失），返回每一步轨迹与两个布尔证明。`rule` / `row` 可选（缺省用旗舰规则与样本用户）：
+
+```bash
+curl -s localhost:8080/rules/selftest -d '{}'
+# -> {"live_add_ok":true,"live_remove_ok":true,"added_rule_id":990001,
+#     "steps":[{"step":"before","rules":N,"matched":[...]},
+#              {"step":"after_add","rules":N+1,"matched":[...,990001]},
+#              {"step":"after_remove","rules":N,"matched":[...]}], ... }
 ```
 
 > `expr` / `cel` 解析器与 `expr` / `cel` runtime 依赖外部库（`github.com/expr-lang/expr`、

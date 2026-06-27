@@ -56,16 +56,19 @@ func (s *Server) App() *fiber.App {
 	app := fiber.New()
 	// Scoring
 	app.Get("/healthz", s.handleHealth)
+	app.Get("/ping2", s.handlePing2)         // lightweight liveness probe
 	app.Get("/rules", s.handleRules)         // rule count
 	app.Get("/metrics", s.handleMetrics)     // Prometheus text exposition
 	app.Post("/match", s.handleMatch)        // single user
 	app.Post("/match/batch", s.handleBatch)  // array of users
+	app.Post("/evaluate", s.handleEvaluate)  // pass/fail + reasons against one rule tree
 	// Operations console (step 11)
 	app.Get("/", s.handleEditor)             // web rule editor
 	app.Get("/rules/list", s.handleRuleList) // list editable rules
 	app.Post("/rules", s.handleRuleUpsert)   // add/update a rule (live)
 	app.Delete("/rules/:id", s.handleRuleDelete)
 	app.Post("/rules/test", s.handleRuleTest)        // test draft vs sample row
+	app.Post("/rules/selftest", s.handleSelfTest)    // live add complex rule -> match -> delete (proof)
 	app.Get("/versions", s.handleVersionList)        // published snapshots
 	app.Post("/versions", s.handlePublish)           // snapshot current set
 	app.Post("/versions/:v/rollback", s.handleRollback)
@@ -144,6 +147,11 @@ func (s *Server) handleRollback(c fiber.Ctx) error {
 
 func (s *Server) handleHealth(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ok": true, "rules": s.eng.RuleCount()})
+}
+
+// handlePing2 is a lightweight liveness probe.
+func (s *Server) handlePing2(c fiber.Ctx) error {
+	return c.JSON(fiber.Map{"ping": "pong2"})
 }
 
 func (s *Server) handleRules(c fiber.Ctx) error {
@@ -247,8 +255,11 @@ func Serve(addr string, eng *engine.Engine) error {
 	fmt.Println("  GET  /              web rule editor (operations console)")
 	fmt.Println("  POST /match        single user  -> matched rules")
 	fmt.Println("  POST /match/batch  []user       -> matched rules")
+	fmt.Println("  POST /evaluate     row -> {passed, reasons[]} against one rule tree")
 	fmt.Println("  GET  /rules/list   list rules    POST /rules add/update    DELETE /rules/:id")
 	fmt.Println("  POST /rules/test   test a draft rule against a sample row")
+	fmt.Println("  POST /rules/selftest  live add a complex rule -> match -> delete (proof)")
 	fmt.Println("  POST /versions     publish snapshot   POST /versions/:v/rollback")
+	fmt.Println("  GET  /ping2        liveness probe -> {\"ping\":\"pong2\"}")
 	return srv.App().Listen(addr)
 }
