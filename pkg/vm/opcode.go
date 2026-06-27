@@ -32,6 +32,7 @@ const (
 	OpIsNotNull                 // pop x:         push x is present/non-null
 	OpAnd                       // pop b,a:       push a && b
 	OpOr                        // pop b,a:       push a || b
+	OpNot                       // pop a:         push !a  (NOT / NOT IN / NOT LIKE)
 )
 
 // Instr is one instruction: an opcode plus a single operand (an index into one

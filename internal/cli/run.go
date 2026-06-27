@@ -248,12 +248,17 @@ func printTopRules(eng *engine.Engine, stats *engine.Stats, n int) {
 // user, which named rules they matched. Demonstrates correctness with readable
 // rules rather than raw throughput.
 func RunDemo(cfg Config) error {
-	eng := newEngine(cfg)
+	// The flagship rule (#6 in data/rules.json) exercises the full operator set,
+	// including NOT IN / NOT LIKE / NOT (...). Only the native SQL front-end
+	// lowers those to IR today (see pkg/parser/qlbridge limitations), so the
+	// demo pins the native front-end + bytecode VM regardless of -frontend.
+	eng := engine.NewWithBackend(engine.NewBytecodeBackend(engine.NativeFrontend{}))
 	loaded, failed, err := eng.LoadRulesFromFile("data/rules.json")
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Backend=%s  loaded %d rules (failed=%d)\n", eng.Backend().Name(), loaded, failed)
+	fmt.Printf("Backend=%s  front-end=native-sql  loaded %d rules (failed=%d)\n",
+		eng.Backend().Name(), loaded, failed)
 
 	users, err := engine.LoadUsers("data/users.json")
 	if err != nil {

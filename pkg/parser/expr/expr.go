@@ -68,7 +68,7 @@ func convert(n exprast.Node) (ir.Node, error) {
 				op = "="
 			}
 			return ir.Compare{Field: field, Op: op, Val: v}, nil
-		case "in":
+		case "in", "not in":
 			field, err := identName(t.Left)
 			if err != nil {
 				return nil, err
@@ -85,9 +85,20 @@ func convert(n exprast.Node) (ir.Node, error) {
 				}
 				vals = append(vals, v)
 			}
-			return ir.In{Field: field, Vals: vals}, nil
+			return ir.In{Field: field, Vals: vals, Negate: t.Operator == "not in"}, nil
 		}
 		return nil, fmt.Errorf("expr: unsupported operator %q", t.Operator)
+
+	case *exprast.UnaryNode: // !expr / not expr -> ir.Not (covers !contains(...), etc.)
+		switch t.Operator {
+		case "!", "not":
+			arg, err := convert(t.Node)
+			if err != nil {
+				return nil, err
+			}
+			return ir.Not{Arg: arg}, nil
+		}
+		return nil, fmt.Errorf("expr: unsupported unary operator %q", t.Operator)
 
 	case *exprast.CallNode:
 		return callToIR(calleeName(t.Callee), t.Arguments)

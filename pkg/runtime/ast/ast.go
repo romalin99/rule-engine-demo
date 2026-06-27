@@ -87,15 +87,18 @@ func eval(n ir.Node, row map[string]any) (bool, error) {
 
 	case ir.In:
 		s := asString(row[t.Field])
+		in := false
 		for _, v := range t.Vals {
 			if s == litString(v) {
-				return true, nil
+				in = true
+				break
 			}
 		}
-		return false, nil
+		return in != t.Negate, nil // NOT IN flips membership
 
 	case ir.Like:
-		return like(asString(row[t.Field]), t.Pattern), nil
+		m := like(asString(row[t.Field]), t.Pattern)
+		return m != t.Negate, nil // NOT LIKE flips the match
 
 	case ir.IsNull:
 		v, present := row[t.Field]
@@ -104,6 +107,13 @@ func eval(n ir.Node, row map[string]any) (bool, error) {
 			return !isNull, nil
 		}
 		return isNull, nil
+
+	case ir.Not:
+		ok, err := eval(t.Arg, row)
+		if err != nil {
+			return false, err
+		}
+		return !ok, nil
 	}
 	return false, fmt.Errorf("ast: unsupported node %T", n)
 }

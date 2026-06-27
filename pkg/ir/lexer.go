@@ -151,6 +151,10 @@ func (l *lexer) lexOp() (token, error) {
 			l.pos += 2
 			return token{Kind: tOp, Text: "<=", Pos: start}, nil
 		}
+		if l.at(1) == '>' { // SQL not-equal: <> is an alias for !=
+			l.pos += 2
+			return token{Kind: tOp, Text: "!=", Pos: start}, nil
+		}
 		l.pos++
 		return token{Kind: tOp, Text: "<", Pos: start}, nil
 	}

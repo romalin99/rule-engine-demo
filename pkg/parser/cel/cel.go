@@ -81,6 +81,16 @@ func callToIR(call celast.CallExpr) (ir.Node, error) {
 		}
 		return ir.Logic{Op: op, Args: nodes}, nil
 
+	case celops.LogicalNot: // !expr  -> ir.Not (covers !(x in [..]), !startsWith, ...)
+		if len(args) != 1 {
+			return nil, fmt.Errorf("cel: ! needs 1 arg")
+		}
+		arg, err := convert(args[0])
+		if err != nil {
+			return nil, err
+		}
+		return ir.Not{Arg: arg}, nil
+
 	case celops.Equals, celops.NotEquals, celops.Less, celops.LessEquals,
 		celops.Greater, celops.GreaterEquals:
 		if len(args) != 2 {

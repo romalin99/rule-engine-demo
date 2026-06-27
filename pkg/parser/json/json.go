@@ -6,13 +6,17 @@
 //
 //	{"and": [ <node>, ... ]}
 //	{"or":  [ <node>, ... ]}
+//	{"not": <node>}                              // NOT (sub-expression)
 //	{"field":"age","op":"between","values":[25,40]}
 //	{"field":"province","op":"in","values":["广东","江苏"]}
+//	{"field":"income_level","op":"not_in","values":["<5k"]}
 //	{"field":"favorite_category","op":"like","value":"数%"}
+//	{"field":"occupation","op":"not_like","value":"%学生%"}
 //	{"field":"active_score","op":">=","value":85}
 //	{"field":"phone","op":"isnull"}              // or "isnotnull"
 //
-// op ∈ { =, ==, !=, >, >=, <, <=, between, in, like, isnull, isnotnull }
+// op ∈ { =, ==, !=, <>, >, >=, <, <=, between, in, not_in, like, not_like,
+//        isnull, isnotnull }. The '<>' alias is accepted as not-equal.
 package json
 
 import (
@@ -45,6 +49,7 @@ func (*Parser) Parse(rule string) (api.Program, error) {
 type node struct {
 	And    []node `json:"and"`
 	Or     []node `json:"or"`
+	Not    *node  `json:"not"` // {"not": <node>} -> ir.Not
 	Field  string `json:"field"`
 	Op     string `json:"op"`
 	Value  any    `json:"value"`
@@ -57,6 +62,12 @@ func (n node) toIR() (ir.Node, error) {
 		return n.logic("AND", n.And)
 	case len(n.Or) > 0:
 		return n.logic("OR", n.Or)
+	case n.Not != nil:
+		arg, err := n.Not.toIR()
+		if err != nil {
+			return nil, err
+		}
+		return ir.Not{Arg: arg}, nil
 	case n.Field != "":
 		return n.leaf()
 	}
@@ -80,14 +91,17 @@ func (n node) logic(op string, children []node) (ir.Node, error) {
 
 func (n node) leaf() (ir.Node, error) {
 	switch n.Op {
-	case "=", "==", "!=", ">", ">=", "<", "<=":
+	case "=", "==", "!=", "<>", ">", ">=", "<", "<=":
 		v, err := jsonVal(n.Value)
 		if err != nil {
 			return nil, err
 		}
 		op := n.Op
-		if op == "==" {
+		switch op {
+		case "==":
 			op = "="
+		case "<>":
+			op = "!="
 		}
 		return ir.Compare{Field: n.Field, Op: op, Val: v}, nil
 	case "between":
@@ -103,7 +117,7 @@ func (n node) leaf() (ir.Node, error) {
 			return nil, err
 		}
 		return ir.Between{Field: n.Field, Lo: lo, Hi: hi}, nil
-	case "in":
+	case "in", "not_in", "notin":
 		vals := make([]ir.Value, 0, len(n.Values))
 		for _, raw := range n.Values {
 			v, err := jsonVal(raw)
@@ -112,13 +126,13 @@ func (n node) leaf() (ir.Node, error) {
 			}
 			vals = append(vals, v)
 		}
-		return ir.In{Field: n.Field, Vals: vals}, nil
-	case "like":
+		return ir.In{Field: n.Field, Vals: vals, Negate: n.Op != "in"}, nil
+	case "like", "not_like", "notlike":
 		s, ok := n.Value.(string)
 		if !ok {
 			return nil, fmt.Errorf("json rule: like value must be string")
 		}
-		return ir.Like{Field: n.Field, Pattern: s}, nil
+		return ir.Like{Field: n.Field, Pattern: s, Negate: n.Op != "like"}, nil
 	case "isnull":
 		return ir.IsNull{Field: n.Field, Negate: false}, nil
 	case "isnotnull":

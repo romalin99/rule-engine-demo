@@ -151,6 +151,17 @@ func (p *Program) Eval(row map[string]any) bool {
 			st[sp] = boolV(a.b || b.b)
 			sp++
 
+		case OpNot:
+			if sp < 1 {
+				return false
+			}
+			a := st[sp-1]
+			sp--
+			// Negate a boolean result; anything non-boolean is treated as false
+			// (so !non-bool stays false rather than silently becoming true).
+			st[sp] = boolV(a.k == kBool && !a.b)
+			sp++
+
 		default:
 			return false
 		}

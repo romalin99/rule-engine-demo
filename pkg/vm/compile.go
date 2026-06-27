@@ -126,6 +126,9 @@ func (c *compiler) emit(n ir.Node) error {
 			vals[i] = valStr(v)
 		}
 		c.add(OpIn, c.setConst(vals))
+		if t.Negate { // NOT IN
+			c.add(OpNot, 0)
+		}
 		return nil
 
 	case ir.Like:
@@ -142,6 +145,9 @@ func (c *compiler) emit(n ir.Node) error {
 		default:
 			c.add(OpLikeEq, si)
 		}
+		if t.Negate { // NOT LIKE
+			c.add(OpNot, 0)
+		}
 		return nil
 
 	case ir.IsNull:
@@ -151,6 +157,13 @@ func (c *compiler) emit(n ir.Node) error {
 		} else {
 			c.add(OpIsNull, 0)
 		}
+		return nil
+
+	case ir.Not:
+		if err := c.emit(t.Arg); err != nil {
+			return err
+		}
+		c.add(OpNot, 0)
 		return nil
 
 	default:

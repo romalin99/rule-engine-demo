@@ -16,7 +16,7 @@ SQL / 表达式 / CEL / JSON，统一编译成字节码，由一个自研 VM 对
 |------|------|
 | DSL 输入：SQL(qlbridge)、SQL(自研)、JSON Rule | ✅ |
 | DSL 输入：CEL、Expr | 🔶 扩展点已留（`frontend_stub.go`） |
-| 算子：`= != > >= < <=`、`BETWEEN`、`IN`、`LIKE`、`AND/OR`、`IS [NOT] NULL` | ✅ |
+| 算子：`= <> != > >= < <=`、`BETWEEN`、`IN`/`NOT IN`、`LIKE`/`NOT LIKE`、`AND/OR`、`NOT (…)`、`IS [NOT] NULL`、括号优先级 | ✅ 原生/JSON 前端全覆盖 |
 | 统一 IR（`ir` 包） | ✅ |
 | 自研字节码 VM（`vm` 包，零分配、并发安全） | ✅ |
 | 可插拔后端：自研 VM ↔ qlbridge VM（可对比吞吐） | ✅ |
@@ -125,6 +125,9 @@ JSON Rule 示例（见 `data/rules_json.json`）：
 ]}
 ```
 
+JSON DSL 也支持取反算子 `not_in` / `not_like` 与 `{"not": <node>}` 包裹，
+完整覆盖示例见 `data/rules_json_full.json`。
+
 ---
 
 ## 🔁 多 DSL 互转
@@ -137,6 +140,32 @@ CEL    : (age >= 25 && age <= 40) && favorite_category.startsWith('数')
 Expr   : (age >= 25 && age <= 40) && hasPrefix(favorite_category, "数")
 Aviator: (age >= 25 && age <= 40) && string.startsWith(favorite_category, '数')
 ```
+
+取反算子同样可发射到各 DSL，例如 `income_level NOT IN ('<5k','5k-10k') AND NOT (risk_level = '高')`：
+
+```
+SQL    : income_level NOT IN ('<5k', '5k-10k') AND NOT (risk_level = '高')
+CEL    : !(income_level in ['<5k', '5k-10k']) && !(risk_level == '高')
+Expr   : !(income_level in ["<5k", "5k-10k"]) && !(risk_level == "高")
+Aviator: !((income_level == '<5k' || income_level == '5k-10k')) && !(risk_level == '高')
+```
+
+### 全算子覆盖 Demo
+
+`data/rules.json` 的规则 #6 用一条规则覆盖了所有算子
+（`=`/`<>`/`>`/`>=`/`<`/`<=`/`BETWEEN`/`IN`/`NOT IN`/`LIKE`/`NOT LIKE`/`AND`/`OR`/`NOT`/括号）。
+它使用 `NOT IN` / `NOT LIKE` / `NOT (…)`，目前仅原生 SQL 与 JSON 前端可解析，
+因此 `-demo` 已固定走原生前端：
+
+```bash
+go run . -demo                 # data/rules.json（含规则 #6）对 data/users.json 实时匹配
+go run ./examples/allops       # 解析→IR→字节码/树遍历双执行→四种 DSL 互转
+go run . -rules data/rules.json -users data/users.json -frontend native
+```
+
+> qlbridge 前端尚未映射取反 AST（`NOT IN`/`NOT LIKE`/`NOT(...)` 会被记为 `failed`，
+> 非致命）；需要取反的规则请用 `-frontend native`。详见
+> [ROADMAP.md](ROADMAP.md) 与 `pkg/parser/qlbridge` 包注释。
 
 ---
 

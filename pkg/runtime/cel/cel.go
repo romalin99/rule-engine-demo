@@ -82,6 +82,8 @@ func collectFields(n ir.Node, acc map[string]struct{}) map[string]struct{} {
 		acc[t.Field] = struct{}{}
 	case ir.IsNull:
 		acc[t.Field] = struct{}{}
+	case ir.Not:
+		collectFields(t.Arg, acc)
 	}
 	return acc
 }

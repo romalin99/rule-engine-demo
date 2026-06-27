@@ -13,6 +13,11 @@ package ir
 // Leaf predicates (Compare / Between / In / Like / IsNull) are returned
 // unchanged. The function is pure and safe to call on any node.
 func Optimize(n Node) Node {
+	// Optimize the operand of a NOT, but keep the NOT itself (negation is not
+	// distributed — that would not be semantics-preserving for IS NULL / OR).
+	if not, ok := n.(Not); ok {
+		return Not{Arg: Optimize(not.Arg)}
+	}
 	logic, ok := n.(Logic)
 	if !ok {
 		return n

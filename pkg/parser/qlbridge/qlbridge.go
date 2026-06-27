@@ -3,6 +3,14 @@
 // participates in evaluation — a Runtime (bytecode/ast/...) does.
 //
 //	Rule(SQL) ─qlbridge.ParseExpression─▶ AST(Node) ─convert─▶ ir.Node
+//
+// Operator coverage: =, <>/!=, >, >=, <, <=, BETWEEN, IN, LIKE, AND, OR,
+// IS [NOT] NULL. Negation forms — NOT IN, NOT LIKE and NOT (group) — are NOT
+// yet mapped here (toIR returns an "unsupported node" error for them, which the
+// engine treats as a non-fatal load failure). The native SQL front-end
+// (pkg/ir) and the JSON front-end support the full set including negation; use
+// `-frontend native` for rules that need NOT. Mapping qlbridge's negation AST
+// (UnaryNode / negated binary) is tracked in ROADMAP.
 package qlbridge
 
 import (

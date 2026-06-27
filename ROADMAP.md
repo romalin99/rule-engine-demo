@@ -14,6 +14,10 @@ input, one IR, one bytecode VM, wide-table batch matching.
 - [x] Benchmarks (TPS / QPS / latency)
 - [x] `BETWEEN`, `IN`, `LIKE`, `AND`/`OR`
 - [x] `IS NULL` / `IS NOT NULL` (native frontend + VM)
+- [x] `<>` (= `!=`), `NOT IN`, `NOT LIKE`, `NOT (…)` group negation — native + JSON
+      front-ends, bytecode VM (`OpNot`), tree-walking runtime, and all 4 emit
+      targets (SQL/CEL/Expr/Aviator). Flagship full-coverage rule: `data/rules.json` #6
+      + `examples/allops`.
 
 ## Phase 2 — Unified parser front-ends 🔶
 
@@ -24,6 +28,9 @@ input, one IR, one bytecode VM, wide-table batch matching.
 - [x] CEL front-end (`pkg/parser/cel`, `github.com/google/cel-go`) — wired via `engine.CELFrontend`
 - [x] Expr front-end (`pkg/parser/expr`, `github.com/expr-lang/expr`) — wired via `engine.ExprFrontend`
 - [ ] Vitess SQL parser front-end — `pkg/parser/vitess` is a documented stub (needs `vitess.io/vitess` sqlparser)
+- [ ] qlbridge front-end negation mapping — `NOT IN` / `NOT LIKE` / `NOT (…)` are not yet
+      lowered from the qlbridge AST (its `UnaryNode` / negated binary). Until then, use
+      `-frontend native` (or JSON) for rules that need NOT; qlbridge marks them `failed`.
 
 ## Phase 3 — Self-built bytecode VM ✅ / 🔶
 
