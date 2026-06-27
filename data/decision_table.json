@@ -1,0 +1,32 @@
+{
+  "name": "marketing_segments",
+  "id_base": 7000,
+  "rows": [
+    {
+      "name": "广东高活跃数码",
+      "priority": 10,
+      "when": [
+        { "field": "age", "op": "between", "values": [25, 40] },
+        { "field": "province", "op": "in", "values": ["广东", "江苏", "浙江"] },
+        { "field": "favorite_category", "op": "like", "value": "数%" },
+        { "field": "active_score", "op": ">=", "value": 85 }
+      ]
+    },
+    {
+      "name": "女性会员复购",
+      "priority": 6,
+      "when": [
+        { "field": "gender", "op": "=", "value": "女" },
+        { "field": "vip_level", "op": ">=", "value": 2 },
+        { "field": "total_amount", "op": ">", "value": 5000 }
+      ]
+    },
+    {
+      "name": "缺手机号补全",
+      "priority": 3,
+      "when": [
+        { "field": "phone", "op": "isnull" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+# binaries
+/rule-engine-demo
+/bin/
+*.exe
+*.out
+*.test
+
+# coverage / profiles
+*.prof
+coverage.txt
+coverage.html
+
+# editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# generated data dumps (keep data/*.json samples)
+/tmp/

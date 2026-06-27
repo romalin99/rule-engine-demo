@@ -1,0 +1,20 @@
+{
+  "description": "Custom functions registered into the qlbridge VM at startup (engine/parser.go). They are usable inside rule expressions alongside the built-in operators (=, >=, <, BETWEEN, IN, LIKE).",
+  "functions": [
+    {
+      "name": "has_prefix",
+      "signature": "has_prefix(field, prefix) -> bool",
+      "returns": "bool",
+      "example": "has_prefix(favorite_category, '数')",
+      "note": "Equivalent to `favorite_category LIKE '数%'`."
+    },
+    {
+      "name": "in_set",
+      "signature": "in_set(field, v1, v2, ...) -> bool",
+      "returns": "bool",
+      "example": "in_set(province, '广东', '江苏', '浙江')",
+      "note": "Function-style alternative to `province IN ('广东','江苏','浙江')`."
+    }
+  ],
+  "builtins_loaded": "github.com/araddon/qlbridge/expr/builtins.LoadAllBuiltins()"
+}
