@@ -4,6 +4,7 @@
     "name": "全算子覆盖-精准圈选(旗舰)",
     "priority": 10,
     "enabled": true,
+    "comment": "全算子覆盖-精准圈选(旗舰)；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age BETWEEN 25 AND 40 AND province IN ('广东','江苏','浙江') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '数%' AND occupation NOT LIKE '%学生%' AND active_score >= 85 AND credit_score BETWEEN 700 AND 850 AND total_amount > 5000 AND avg_order_amount <= 1000 AND last_login_time IS NOT NULL AND (vip_level >= 3 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
   },
   {
@@ -11,6 +12,7 @@
     "name": "高价值精准圈选-复杂规则#02",
     "priority": 11,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#02；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender = '女' AND age BETWEEN 25 AND 43 AND province IN ('浙江','上海','北京','山东') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '母%' AND city NOT LIKE '%县' AND active_score >= 78 AND credit_score >= 680 AND total_amount BETWEEN 4000 AND 80000 AND login_days_30d >= 20 AND (vip_level >= 3 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 250 AND marital_status <> '未知'"
   },
   {
@@ -18,6 +20,7 @@
     "name": "高价值精准圈选-复杂规则#03",
     "priority": 12,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#03；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age >= 28 AND age <= 42 AND province NOT IN ('北京','山东','四川') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%家%' AND occupation NOT LIKE '%学生%' AND active_score > 86 AND credit_score BETWEEN 740 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 12000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 360"
   },
   {
@@ -25,6 +28,7 @@
     "name": "高价值精准圈选-复杂规则#04",
     "priority": 13,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#04；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender <> '未知' AND age BETWEEN 28 AND 39 AND province IN ('四川','湖北','福建','湖南','广东') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 85 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 30 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
   },
   {
@@ -32,6 +36,7 @@
     "name": "高价值精准圈选-复杂规则#05",
     "priority": 14,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#05；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age BETWEEN 25 AND 40 AND province IN ('北京','山东','四川') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '家%' AND occupation NOT LIKE '%实习%' AND active_score >= 80 AND credit_score BETWEEN 700 AND 840 AND total_amount > 9000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 4 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
   },
   {
@@ -39,6 +44,7 @@
     "name": "高价值精准圈选-复杂规则#06",
     "priority": 15,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#06；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender = '女' AND age BETWEEN 30 AND 46 AND province IN ('四川','湖北','福建','湖南') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '食%' AND city NOT LIKE '%县' AND active_score >= 75 AND credit_score >= 680 AND total_amount BETWEEN 5000 AND 80000 AND login_days_30d >= 25 AND (vip_level >= 4 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 300 AND marital_status <> '未知'"
   },
   {
@@ -46,6 +52,7 @@
     "name": "高价值精准圈选-复杂规则#07",
     "priority": 10,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#07；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age >= 24 AND age <= 42 AND province NOT IN ('福建','湖南','广东') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%数%' AND occupation NOT LIKE '%实习%' AND active_score > 82 AND credit_score BETWEEN 700 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 8000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 240"
   },
   {
@@ -53,6 +60,7 @@
     "name": "高价值精准圈选-复杂规则#08",
     "priority": 11,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#08；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender <> '未知' AND age BETWEEN 28 AND 41 AND province IN ('广东','江苏','浙江','上海','北京') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 86 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 40 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
   },
   {
@@ -60,6 +68,7 @@
     "name": "高价值精准圈选-复杂规则#09",
     "priority": 12,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#09；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age BETWEEN 28 AND 42 AND province IN ('福建','湖南','广东') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '数%' AND occupation NOT LIKE '%兼职%' AND active_score >= 80 AND credit_score BETWEEN 720 AND 840 AND total_amount > 8000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 5 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
   },
   {
@@ -67,6 +76,7 @@
     "name": "高价值精准圈选-复杂规则#10",
     "priority": 13,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#10；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender = '女' AND age BETWEEN 20 AND 40 AND province IN ('广东','江苏','浙江','上海') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '母%' AND city NOT LIKE '%县' AND active_score >= 87 AND credit_score >= 680 AND total_amount BETWEEN 3000 AND 80000 AND login_days_30d >= 15 AND (vip_level >= 2 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 200 AND marital_status <> '未知'"
   },
   {
@@ -74,6 +84,7 @@
     "name": "高价值精准圈选-复杂规则#11",
     "priority": 14,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#11；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age >= 26 AND age <= 42 AND province NOT IN ('浙江','上海','北京') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%家%' AND occupation NOT LIKE '%兼职%' AND active_score > 84 AND credit_score BETWEEN 720 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 10000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 300"
   },
   {
@@ -81,6 +92,7 @@
     "name": "高价值精准圈选-复杂规则#12",
     "priority": 15,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#12；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender <> '未知' AND age BETWEEN 28 AND 43 AND province IN ('北京','山东','四川','湖北','福建') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 87 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 50 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
   },
   {
@@ -88,6 +100,7 @@
     "name": "高价值精准圈选-复杂规则#13",
     "priority": 10,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#13；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age BETWEEN 22 AND 38 AND province IN ('浙江','上海','北京') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '家%' AND occupation NOT LIKE '%学生%' AND active_score >= 80 AND credit_score BETWEEN 680 AND 840 AND total_amount > 7000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 3 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
   },
   {
@@ -95,6 +108,7 @@
     "name": "高价值精准圈选-复杂规则#14",
     "priority": 11,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#14；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender = '女' AND age BETWEEN 25 AND 43 AND province IN ('北京','山东','四川','湖北') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '食%' AND city NOT LIKE '%县' AND active_score >= 84 AND credit_score >= 680 AND total_amount BETWEEN 4000 AND 80000 AND login_days_30d >= 20 AND (vip_level >= 3 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 250 AND marital_status <> '未知'"
   },
   {
@@ -102,6 +116,7 @@
     "name": "高价值精准圈选-复杂规则#15",
     "priority": 12,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#15；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age >= 28 AND age <= 42 AND province NOT IN ('四川','湖北','福建') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%数%' AND occupation NOT LIKE '%学生%' AND active_score > 86 AND credit_score BETWEEN 740 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 12000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 360"
   },
   {
@@ -109,6 +124,7 @@
     "name": "高价值精准圈选-复杂规则#16",
     "priority": 13,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#16；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender <> '未知' AND age BETWEEN 28 AND 39 AND province IN ('福建','湖南','广东','江苏','浙江') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 85 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 30 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
   },
   {
@@ -116,6 +132,7 @@
     "name": "高价值精准圈选-复杂规则#17",
     "priority": 14,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#17；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age BETWEEN 25 AND 40 AND province IN ('四川','湖北','福建') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '数%' AND occupation NOT LIKE '%实习%' AND active_score >= 80 AND credit_score BETWEEN 700 AND 840 AND total_amount > 6000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 4 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
   },
   {
@@ -123,6 +140,7 @@
     "name": "高价值精准圈选-复杂规则#18",
     "priority": 15,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#18；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender = '女' AND age BETWEEN 30 AND 46 AND province IN ('福建','湖南','广东','江苏') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '母%' AND city NOT LIKE '%县' AND active_score >= 81 AND credit_score >= 680 AND total_amount BETWEEN 5000 AND 80000 AND login_days_30d >= 25 AND (vip_level >= 4 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 300 AND marital_status <> '未知'"
   },
   {
@@ -130,6 +148,7 @@
     "name": "高价值精准圈选-复杂规则#19",
     "priority": 10,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#19；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age >= 24 AND age <= 42 AND province NOT IN ('广东','江苏','浙江') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%家%' AND occupation NOT LIKE '%实习%' AND active_score > 82 AND credit_score BETWEEN 700 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 8000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 240"
   },
   {
@@ -137,6 +156,7 @@
     "name": "高价值精准圈选-复杂规则#20",
     "priority": 11,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#20；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender <> '未知' AND age BETWEEN 28 AND 41 AND province IN ('浙江','上海','北京','山东','四川') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 86 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 40 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
   },
   {
@@ -144,6 +164,7 @@
     "name": "高价值精准圈选-复杂规则#21",
     "priority": 12,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#21；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age BETWEEN 28 AND 42 AND province IN ('广东','江苏','浙江') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '家%' AND occupation NOT LIKE '%兼职%' AND active_score >= 80 AND credit_score BETWEEN 720 AND 840 AND total_amount > 5000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 5 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
   },
   {
@@ -151,6 +172,7 @@
     "name": "高价值精准圈选-复杂规则#22",
     "priority": 13,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#22；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender = '女' AND age BETWEEN 20 AND 40 AND province IN ('浙江','上海','北京','山东') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '食%' AND city NOT LIKE '%县' AND active_score >= 78 AND credit_score >= 680 AND total_amount BETWEEN 3000 AND 80000 AND login_days_30d >= 15 AND (vip_level >= 2 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 200 AND marital_status <> '未知'"
   },
   {
@@ -158,6 +180,7 @@
     "name": "高价值精准圈选-复杂规则#23",
     "priority": 14,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#23；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age >= 26 AND age <= 42 AND province NOT IN ('北京','山东','四川') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%数%' AND occupation NOT LIKE '%兼职%' AND active_score > 84 AND credit_score BETWEEN 720 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 10000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 300"
   },
   {
@@ -165,6 +188,7 @@
     "name": "高价值精准圈选-复杂规则#24",
     "priority": 15,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#24；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender <> '未知' AND age BETWEEN 28 AND 43 AND province IN ('四川','湖北','福建','湖南','广东') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 87 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 50 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
   },
   {
@@ -172,6 +196,7 @@
     "name": "高价值精准圈选-复杂规则#25",
     "priority": 10,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#25；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age BETWEEN 22 AND 38 AND province IN ('北京','山东','四川') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '数%' AND occupation NOT LIKE '%学生%' AND active_score >= 80 AND credit_score BETWEEN 680 AND 840 AND total_amount > 9000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 3 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
   },
   {
@@ -179,6 +204,7 @@
     "name": "高价值精准圈选-复杂规则#26",
     "priority": 11,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#26；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender = '女' AND age BETWEEN 25 AND 43 AND province IN ('四川','湖北','福建','湖南') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '母%' AND city NOT LIKE '%县' AND active_score >= 75 AND credit_score >= 680 AND total_amount BETWEEN 4000 AND 80000 AND login_days_30d >= 20 AND (vip_level >= 3 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 250 AND marital_status <> '未知'"
   },
   {
@@ -186,6 +212,7 @@
     "name": "高价值精准圈选-复杂规则#27",
     "priority": 12,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#27；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age >= 28 AND age <= 42 AND province NOT IN ('福建','湖南','广东') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%家%' AND occupation NOT LIKE '%学生%' AND active_score > 86 AND credit_score BETWEEN 740 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 12000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 360"
   },
   {
@@ -193,6 +220,7 @@
     "name": "高价值精准圈选-复杂规则#28",
     "priority": 13,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#28；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender <> '未知' AND age BETWEEN 28 AND 39 AND province IN ('广东','江苏','浙江','上海','北京') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 85 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 30 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
   },
   {
@@ -200,6 +228,7 @@
     "name": "高价值精准圈选-复杂规则#29",
     "priority": 14,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#29；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age BETWEEN 25 AND 40 AND province IN ('福建','湖南','广东') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '家%' AND occupation NOT LIKE '%实习%' AND active_score >= 80 AND credit_score BETWEEN 700 AND 840 AND total_amount > 8000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 4 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
   },
   {
@@ -207,6 +236,7 @@
     "name": "高价值精准圈选-复杂规则#30",
     "priority": 15,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#30；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender = '女' AND age BETWEEN 30 AND 46 AND province IN ('广东','江苏','浙江','上海') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '食%' AND city NOT LIKE '%县' AND active_score >= 87 AND credit_score >= 680 AND total_amount BETWEEN 5000 AND 80000 AND login_days_30d >= 25 AND (vip_level >= 4 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 300 AND marital_status <> '未知'"
   },
   {
@@ -214,6 +244,7 @@
     "name": "高价值精准圈选-复杂规则#31",
     "priority": 10,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#31；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age >= 24 AND age <= 42 AND province NOT IN ('浙江','上海','北京') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%数%' AND occupation NOT LIKE '%实习%' AND active_score > 82 AND credit_score BETWEEN 700 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 8000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 240"
   },
   {
@@ -221,6 +252,7 @@
     "name": "高价值精准圈选-复杂规则#32",
     "priority": 11,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#32；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender <> '未知' AND age BETWEEN 28 AND 41 AND province IN ('北京','山东','四川','湖北','福建') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 86 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 40 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
   },
   {
@@ -228,6 +260,7 @@
     "name": "高价值精准圈选-复杂规则#33",
     "priority": 12,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#33；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age BETWEEN 28 AND 42 AND province IN ('浙江','上海','北京') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '数%' AND occupation NOT LIKE '%兼职%' AND active_score >= 80 AND credit_score BETWEEN 720 AND 840 AND total_amount > 7000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 5 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
   },
   {
@@ -235,6 +268,7 @@
     "name": "高价值精准圈选-复杂规则#34",
     "priority": 13,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#34；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender = '女' AND age BETWEEN 20 AND 40 AND province IN ('北京','山东','四川','湖北') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '母%' AND city NOT LIKE '%县' AND active_score >= 84 AND credit_score >= 680 AND total_amount BETWEEN 3000 AND 80000 AND login_days_30d >= 15 AND (vip_level >= 2 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 200 AND marital_status <> '未知'"
   },
   {
@@ -242,6 +276,7 @@
     "name": "高价值精准圈选-复杂规则#35",
     "priority": 14,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#35；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age >= 26 AND age <= 42 AND province NOT IN ('四川','湖北','福建') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%家%' AND occupation NOT LIKE '%兼职%' AND active_score > 84 AND credit_score BETWEEN 720 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 10000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 300"
   },
   {
@@ -249,6 +284,7 @@
     "name": "高价值精准圈选-复杂规则#36",
     "priority": 15,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#36；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender <> '未知' AND age BETWEEN 28 AND 43 AND province IN ('福建','湖南','广东','江苏','浙江') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 87 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 50 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
   },
   {
@@ -256,6 +292,7 @@
     "name": "高价值精准圈选-复杂规则#37",
     "priority": 10,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#37；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age BETWEEN 22 AND 38 AND province IN ('四川','湖北','福建') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '家%' AND occupation NOT LIKE '%学生%' AND active_score >= 80 AND credit_score BETWEEN 680 AND 840 AND total_amount > 6000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 3 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
   },
   {
@@ -263,6 +300,7 @@
     "name": "高价值精准圈选-复杂规则#38",
     "priority": 11,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#38；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender = '女' AND age BETWEEN 25 AND 43 AND province IN ('福建','湖南','广东','江苏') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '食%' AND city NOT LIKE '%县' AND active_score >= 81 AND credit_score >= 680 AND total_amount BETWEEN 4000 AND 80000 AND login_days_30d >= 20 AND (vip_level >= 3 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 250 AND marital_status <> '未知'"
   },
   {
@@ -270,6 +308,7 @@
     "name": "高价值精准圈选-复杂规则#39",
     "priority": 12,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#39；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age >= 28 AND age <= 42 AND province NOT IN ('广东','江苏','浙江') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%数%' AND occupation NOT LIKE '%学生%' AND active_score > 86 AND credit_score BETWEEN 740 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 12000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 360"
   },
   {
@@ -277,6 +316,7 @@
     "name": "高价值精准圈选-复杂规则#40",
     "priority": 13,
     "enabled": true,
+    "comment": "高价值精准圈选-复杂规则#40；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "gender <> '未知' AND age BETWEEN 28 AND 39 AND province IN ('浙江','上海','北京','山东','四川') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 85 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 30 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
   },
   {
@@ -284,6 +324,7 @@
     "name": "基础圈选-高活跃用户",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-高活跃用户；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "active_score >= 90"
   },
   {
@@ -291,6 +332,7 @@
     "name": "基础圈选-高级会员",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-高级会员；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "vip_level >= 5"
   },
   {
@@ -298,6 +340,7 @@
     "name": "基础圈选-高信用",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-高信用；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "credit_score > 700"
   },
   {
@@ -305,6 +348,7 @@
     "name": "基础圈选-年轻客群",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-年轻客群；覆盖算子: BETWEEN；仅基础算子，qlbridge / native 前端均可。",
     "expr": "age BETWEEN 18 AND 25"
   },
   {
@@ -312,6 +356,7 @@
     "name": "基础圈选-华东两省",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-华东两省；覆盖算子: IN；仅基础算子，qlbridge / native 前端均可。",
     "expr": "province IN ('广东','江苏')"
   },
   {
@@ -319,6 +364,7 @@
     "name": "基础圈选-高消费",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-高消费；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "total_amount > 10000"
   },
   {
@@ -326,6 +372,7 @@
     "name": "基础圈选-女性客群",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-女性客群；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "gender = '女'"
   },
   {
@@ -333,6 +380,7 @@
     "name": "基础圈选-低风险",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-低风险；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "risk_level = '低'"
   },
   {
@@ -340,6 +388,7 @@
     "name": "基础圈选-高频下单",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-高频下单；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "order_count >= 50"
   },
   {
@@ -347,6 +396,7 @@
     "name": "基础圈选-近月活跃",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-近月活跃；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "login_days_30d >= 20"
   },
   {
@@ -354,6 +404,7 @@
     "name": "基础圈选-数码偏好",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-数码偏好；覆盖算子: LIKE；仅基础算子，qlbridge / native 前端均可。",
     "expr": "favorite_category LIKE '数%'"
   },
   {
@@ -361,6 +412,7 @@
     "name": "基础圈选-中高收入",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-中高收入；覆盖算子: IN；仅基础算子，qlbridge / native 前端均可。",
     "expr": "income_level IN ('20k-30k','30k+')"
   },
   {
@@ -368,6 +420,7 @@
     "name": "基础圈选-老用户",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-老用户；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "register_days >= 365"
   },
   {
@@ -375,6 +428,7 @@
     "name": "基础圈选-婚况已知",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-婚况已知；覆盖算子: <>、比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "marital_status <> '未知'"
   },
   {
@@ -382,6 +436,7 @@
     "name": "基础圈选-小额客单",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-小额客单；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "avg_order_amount <= 500"
   },
   {
@@ -389,6 +444,7 @@
     "name": "基础圈选-苹果设备",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-苹果设备；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "device_type = 'iPhone'"
   },
   {
@@ -396,6 +452,7 @@
     "name": "基础圈选-非学生",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-非学生；覆盖算子: NOT LIKE；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "occupation NOT LIKE '%学生%'"
   },
   {
@@ -403,6 +460,7 @@
     "name": "基础圈选-一线城市",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-一线城市；覆盖算子: LIKE、OR；仅基础算子，qlbridge / native 前端均可。",
     "expr": "city LIKE '深%' OR city LIKE '广%'"
   },
   {
@@ -410,6 +468,7 @@
     "name": "基础圈选-活跃会员",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-活跃会员；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "vip_level >= 2 AND active_score >= 80"
   },
   {
@@ -417,6 +476,7 @@
     "name": "基础圈选-成熟高消费",
     "priority": 5,
     "enabled": true,
+    "comment": "基础圈选-成熟高消费；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "age >= 30 AND total_amount > 5000"
   }
 ]

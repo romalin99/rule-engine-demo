@@ -148,7 +148,7 @@ status: ## Print project statistics
 
 swagger: ## Regenerate Swagger docs (http://localhost:<port>/swagger/index.html)
 	@ln -sf $(MAIN) ./main.go
-	@swag fmt && swag init -g $(MAIN) -o ./docs --parseDependency --parseInternal --parseGoList
+	@swag fmt && swag init -g $(MAIN) -o ./docs  --parseDependency --parseInternal --parseGoList
 	@rm -f ./main.go
 
 # ── Misc ──────────────────────────────────────────────────────────────────────

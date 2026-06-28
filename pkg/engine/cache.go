@@ -20,10 +20,9 @@ import (
 // immutable snapshot slice so workers iterate a plain []*RuleProgram (much
 // faster and allocation-free than ranging a sync.Map every time).
 type RuleCache struct {
-	m sync.Map // int64 -> *model.RuleProgram
-
-	mu       sync.RWMutex
+	m        sync.Map
 	snapshot []*model.RuleProgram
+	mu       sync.RWMutex
 }
 
 // NewRuleCache returns an empty cache.

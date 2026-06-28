@@ -4,6 +4,7 @@
     "name": "电商精准营销-广东高价值男性",
     "priority": 10,
     "enabled": true,
+    "comment": "电商精准营销-广东高价值男性；覆盖算子: BETWEEN、比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "gender = '男' AND age BETWEEN 25 AND 35 AND province = '广东' AND vip_level >= 3 AND total_amount >= 10000"
   },
   {
@@ -11,6 +12,7 @@
     "name": "活跃iPhone低风险用户",
     "priority": 8,
     "enabled": true,
+    "comment": "活跃iPhone低风险用户；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "login_days_30d >= 20 AND active_score >= 80 AND order_count >= 10 AND risk_level = '低' AND device_type = 'iPhone'"
   },
   {
@@ -18,6 +20,7 @@
     "name": "风控-高消费低信用低活跃",
     "priority": 20,
     "enabled": true,
+    "comment": "风控-高消费低信用低活跃；覆盖算子: IN、比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "credit_score < 600 AND total_amount > 50000 AND login_days_30d < 5 AND province IN ('广东','浙江') AND age > 45"
   },
   {
@@ -25,6 +28,7 @@
     "name": "数码高活跃中高收入(IN/BETWEEN/LIKE)",
     "priority": 12,
     "enabled": true,
+    "comment": "数码高活跃中高收入(IN/BETWEEN/LIKE)；覆盖算子: BETWEEN、IN、LIKE、比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "age BETWEEN 25 AND 40 AND province IN ('广东','江苏','浙江') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '数%' AND active_score >= 85"
   },
   {
@@ -32,6 +36,7 @@
     "name": "女性会员复购",
     "priority": 6,
     "enabled": true,
+    "comment": "女性会员复购；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "gender = '女' AND age >= 30 AND vip_level >= 2 AND total_amount > 5000 AND login_days_30d >= 15"
   },
   {

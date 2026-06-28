@@ -1,4 +1,4 @@
-package router
+package handler
 
 import (
 	"sort"
@@ -6,14 +6,14 @@ import (
 	"time"
 )
 
-// latencyRecorder keeps a bounded ring of recent scoring latencies so the server
+// latencyRecorder keeps a bounded ring of recent /match latencies so the handler
 // can report p50 / p90 / p99 at /metrics with no external dependency. It is
 // concurrency-safe; recording is O(1) and percentile computation is O(n log n)
 // over the (capped) window.
 type latencyRecorder struct {
-	mu   sync.Mutex
 	buf  []time.Duration
 	idx  int
+	mu   sync.Mutex
 	full bool
 }
 

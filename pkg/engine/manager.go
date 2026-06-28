@@ -16,19 +16,19 @@ import (
 // Edits take effect immediately (the engine recompiles the single changed rule
 // and atomically rebuilds its snapshot); no restart, no file reload required.
 type Manager struct {
-	mu       sync.Mutex
 	eng      *Engine
 	rules    map[int64]model.Rule
 	versions []Version
+	mu       sync.Mutex
 }
 
 // Version is a published, restorable snapshot of the entire rule set.
 type Version struct {
-	Version int          `json:"version"`
 	Time    time.Time    `json:"time"`
 	Note    string       `json:"note"`
-	Count   int          `json:"count"`
 	Rules   []model.Rule `json:"rules"`
+	Version int          `json:"version"`
+	Count   int          `json:"count"`
 }
 
 // NewManager wraps an engine and seeds the editable set from its current cache.

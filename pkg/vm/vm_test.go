@@ -24,8 +24,8 @@ func TestCompileAndEval(t *testing.T) {
 	}
 
 	cases := []struct {
-		name string
 		row  map[string]any
+		name string
 		want bool
 	}{
 		{"hit", map[string]any{"age": 30, "province": "广东", "favorite_category": "数码", "active_score": 90.0}, true},
@@ -44,8 +44,8 @@ func TestCompileAndEval(t *testing.T) {
 
 func TestOperators(t *testing.T) {
 	cases := []struct {
-		rule string
 		row  map[string]any
+		rule string
 		want bool
 	}{
 		{"gender = '男'", map[string]any{"gender": "男"}, true},
@@ -128,8 +128,8 @@ func TestFullCoverageRule(t *testing.T) {
 
 	// Each entry breaks exactly one clause and must flip the result to miss.
 	misses := []struct {
-		why string
 		row map[string]any
+		why string
 	}{
 		{"NOT IN fails", flip(match, "income_level", "<5k")},
 		{"NOT LIKE fails", flip(match, "occupation", "在校学生")},

@@ -93,7 +93,6 @@ func (m Module) String() string { return string(m) }
 const (
 	ModuleOracle             Module = "oracle"
 	ModuleRedis              Module = "redis"
-	ModuleMongo              Module = "mongo"
 	ModuleSecurityQuestion   Module = "security_question"
 	ModuleCustomer           Module = "customer"
 	ModuleProfile            Module = "profile"

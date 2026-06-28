@@ -1,0 +1,8 @@
+all: true
+output: "./mock"
+outpkg: "mock"
+filename: "mock_{{ .InterfaceName | lower }}.go"
+dir: "."
+keeptree: true
+with-expecter: true
+mockname: "Mock{{ .InterfaceName }}"

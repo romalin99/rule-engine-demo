@@ -66,7 +66,7 @@ func (c *Config) Init(fileName string) {
 	{
 		viperConfig.SetDefault("env", "pro")
 		viperConfig.SetDefault("host", "0.0.0.0")
-		viperConfig.SetDefault("port", 18989)
+		viperConfig.SetDefault("port", 18080)
 		viperConfig.SetDefault("timeout", 30)           // In second
 		viperConfig.SetDefault("bodyLimit", 10485760*5) // 10M * 5
 		viperConfig.SetDefault("shutdownTimeout", 30)   // In second
@@ -91,25 +91,6 @@ func (c *Config) Init(fileName string) {
 		viperConfig.SetDefault("oracle.read_timeout", 15*time.Second)   // In second
 		viperConfig.SetDefault("oracle.write_timeout", 15*time.Second)  // In second
 		viperConfig.SetDefault("oracle.write_timeout", 150*time.Second) // In second
-	}
-	// 4th tier default
-	{
-		viperConfig.SetDefault("mongo.max_connecting", 8)
-		viperConfig.SetDefault("mongo.max_pool_size", 500)
-		viperConfig.SetDefault("mongo.min_pool_size", 20)
-		viperConfig.SetDefault("mongo.max_conn_idle_time", 600*time.Second) // In second
-		//
-		viperConfig.SetDefault("mongo.connect_timeout", 10*time.Second)          // In second
-		viperConfig.SetDefault("mongo.server_selection_timeout", 30*time.Second) // In second
-		//
-		viperConfig.SetDefault("mongo.enable_slow_query_log", true)
-		viperConfig.SetDefault("mongo.slow_query_threshold", 1*time.Second) // In second
-		//
-		viperConfig.SetDefault("mongo.enable_stats_monitor", true)
-		viperConfig.SetDefault("mongo.stats_interval", 60*time.Second) // In second
-		viperConfig.SetDefault("mongo.expire_at", 180)                 // In day
-		viperConfig.SetDefault("mongo.read_timeout", 15*time.Second)   // In second
-		viperConfig.SetDefault("mongo.write_timeout", 15*time.Second)  // In second
 	}
 	// 5th tier default
 	{

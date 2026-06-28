@@ -44,12 +44,12 @@ type Instr struct {
 
 // Program is compiled bytecode plus its constant pools.
 type Program struct {
-	Code   []Instr               // instruction stream
-	Nums   []float64             // numeric constants
-	Strs   []string              // string constants (and LIKE cores)
-	Fields []string              // field names referenced by OpLoadField
-	Sets   []map[string]struct{} // IN membership sets
-	Source string                // original rule text (debugging)
+	Source string
+	Code   []Instr
+	Nums   []float64
+	Strs   []string
+	Fields []string
+	Sets   []map[string]struct{}
 }
 
 // Len reports the number of instructions.

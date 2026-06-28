@@ -14,11 +14,11 @@ import "encoding/json"
 //	  "rule": "age BETWEEN 25 AND 40 AND province IN ('广东','江苏','浙江') AND active_score>=85"
 //	}
 type Rule struct {
-	ID       int64  `json:"id"`
 	Name     string `json:"name"`
 	Expr     string `json:"rule"`
-	Priority int    `json:"priority"` // higher sorts first
-	Version  int    `json:"version"`  // monotonic per-rule revision (0 = unset)
+	ID       int64  `json:"id"`
+	Priority int    `json:"priority"`
+	Version  int    `json:"version"`
 	Enabled  bool   `json:"enabled"`
 }
 
@@ -27,13 +27,13 @@ type Rule struct {
 // defaults to true (a rule present in the file is active unless disabled).
 func (r *Rule) UnmarshalJSON(b []byte) error {
 	var raw struct {
-		ID       int64  `json:"id"`
+		Enabled  *bool  `json:"enabled"`
 		Name     string `json:"name"`
 		Rule     string `json:"rule"`
 		Expr     string `json:"expr"`
+		ID       int64  `json:"id"`
 		Priority int    `json:"priority"`
 		Version  int    `json:"version"`
-		Enabled  *bool  `json:"enabled"`
 	}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
@@ -54,9 +54,9 @@ func (r *Rule) UnmarshalJSON(b []byte) error {
 // MarshalJSON writes the canonical schema (using the "expr" key).
 func (r Rule) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		ID       int64  `json:"id"`
 		Name     string `json:"name"`
 		Expr     string `json:"expr"`
+		ID       int64  `json:"id"`
 		Priority int    `json:"priority"`
 		Version  int    `json:"version"`
 		Enabled  bool   `json:"enabled"`
@@ -71,10 +71,10 @@ func (r Rule) MarshalJSON() ([]byte, error) {
 // once at startup; afterwards the hot path only evaluates the cached AST and
 // never re-parses.
 type RuleProgram struct {
-	ID       int64
+	AST      any
 	Name     string
-	Priority int    // copied from Rule; controls match/sort order (higher first)
-	Version  int    // copied from Rule; per-rule revision for hot-update tracking
-	Source   string // original expression text (for logging / debugging)
-	AST      any    // compiled expr.Node
+	Source   string
+	ID       int64
+	Priority int
+	Version  int
 }

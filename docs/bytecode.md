@@ -1,4 +1,4 @@
-# Bytecode VM
+w# Bytecode VM
 
 The default runtime lowers the (optimized) IR to a compact stack bytecode
 (`pkg/vm`) and evaluates it against `map[string]any` with no per-eval allocation.

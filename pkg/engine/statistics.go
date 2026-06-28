@@ -9,15 +9,13 @@ import (
 
 // Stats captures the outcome and performance of a batch match run.
 type Stats struct {
+	PerRule     map[int64]int64
 	Users       int
 	Rules       int
 	Workers     int
-	Evaluations int64 // total rule evaluations = Users * Rules
-	Hits        int64 // total (user,rule) matches
+	Evaluations int64
+	Hits        int64
 	Elapsed     time.Duration
-
-	// PerRule maps rule ID -> number of users that matched it.
-	PerRule map[int64]int64
 }
 
 // TPS is throughput in rule-evaluations per second (the engine's core metric).

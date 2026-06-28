@@ -17,19 +17,19 @@ import (
 
 // Config controls a benchmark/match run.
 type Config struct {
-	RulesFile string // load rules from this JSON file (empty = generate)
-	UsersFile string // load users from this JSON file (empty = generate)
-	GenRules  int    // number of rules to generate when RulesFile is empty
-	GenUsers  int    // number of users to generate when UsersFile is empty
-	Workers   int    // worker goroutines (0 = GOMAXPROCS)
-	Seed      int64  // RNG seed for reproducible generation
-	TopN      int    // print this many most-hit rules (0 = none)
-	Demo      bool   // run the named 5-rule demo on sample users and exit
-	Serve     string // if set (e.g. ":8080"), start the HTTP scoring server
-	Export    string // if set (sql|aviator|cel|expr), convert rules and exit
-	Backend   string // "bytecode" (custom VM) or "qlbridge" (qlbridge VM)
-	Frontend  string // bytecode parser front-end: "qlbridge" or "native"
-	Watch     bool   // with -serve + -rules: hot-reload the rules file on change
+	Serve     string
+	UsersFile string
+	Frontend  string
+	RulesFile string
+	Backend   string
+	Export    string
+	GenUsers  int
+	TopN      int
+	Seed      int64
+	Workers   int
+	GenRules  int
+	Demo      bool
+	Watch     bool
 }
 
 // DefaultConfig returns the out-of-the-box configuration used by `go run  cmd/api/main.go`.
