@@ -9,6 +9,7 @@
 package vm
 
 import (
+	"maps"
 	"strings"
 	"testing"
 
@@ -28,12 +29,12 @@ func TestCompileAndEval(t *testing.T) {
 		name string
 		want bool
 	}{
-		{"hit", map[string]any{"age": 30, "province": "广东", "favorite_category": "数码", "active_score": 90.0}, true},
-		{"age too old", map[string]any{"age": 50, "province": "广东", "favorite_category": "数码", "active_score": 90.0}, false},
-		{"wrong province", map[string]any{"age": 30, "province": "北京", "favorite_category": "数码", "active_score": 90.0}, false},
-		{"not 数 prefix", map[string]any{"age": 30, "province": "广东", "favorite_category": "图书", "active_score": 90.0}, false},
-		{"low score", map[string]any{"age": 30, "province": "广东", "favorite_category": "数码", "active_score": 70.0}, false},
-		{"missing field", map[string]any{"age": 30, "province": "广东", "favorite_category": "数码"}, false},
+		{name: "hit", row: map[string]any{"age": 30, "province": "广东", "favorite_category": "数码", "active_score": 90.0}, want: true},
+		{name: "age too old", row: map[string]any{"age": 50, "province": "广东", "favorite_category": "数码", "active_score": 90.0}, want: false},
+		{name: "wrong province", row: map[string]any{"age": 30, "province": "北京", "favorite_category": "数码", "active_score": 90.0}, want: false},
+		{name: "not 数 prefix", row: map[string]any{"age": 30, "province": "广东", "favorite_category": "图书", "active_score": 90.0}, want: false},
+		{name: "low score", row: map[string]any{"age": 30, "province": "广东", "favorite_category": "数码", "active_score": 70.0}, want: false},
+		{name: "missing field", row: map[string]any{"age": 30, "province": "广东", "favorite_category": "数码"}, want: false},
 	}
 	for _, c := range cases {
 		if got := prog.Eval(c.row); got != c.want {
@@ -48,38 +49,38 @@ func TestOperators(t *testing.T) {
 		rule string
 		want bool
 	}{
-		{"gender = '男'", map[string]any{"gender": "男"}, true},
-		{"gender = '男'", map[string]any{"gender": "女"}, false},
-		{"vip_level >= 3", map[string]any{"vip_level": 3}, true},
-		{"vip_level >= 3", map[string]any{"vip_level": 2}, false},
-		{"credit_score < 600", map[string]any{"credit_score": 580.0}, true},
-		{"total_amount > 50000 AND age > 45", map[string]any{"total_amount": 60000.0, "age": 48}, true},
-		{"total_amount > 50000 AND age > 45", map[string]any{"total_amount": 60000.0, "age": 30}, false},
-		{"a = 1 OR b = 2", map[string]any{"a": 9, "b": 2}, true},
-		{"a = 1 OR b = 2", map[string]any{"a": 9, "b": 9}, false},
-		{"name LIKE '%店'", map[string]any{"name": "便利店"}, true},
-		{"name LIKE '%码%'", map[string]any{"name": "数码城"}, true},
-		{"phone IS NULL", map[string]any{"name": "x"}, true},
-		{"phone IS NULL", map[string]any{"phone": "139"}, false},
-		{"phone IS NOT NULL", map[string]any{"phone": "139"}, true},
-		{"phone IS NOT NULL AND age >= 18", map[string]any{"phone": "139", "age": 20}, true},
+		{rule: "gender = '男'", row: map[string]any{"gender": "男"}, want: true},
+		{rule: "gender = '男'", row: map[string]any{"gender": "女"}, want: false},
+		{rule: "vip_level >= 3", row: map[string]any{"vip_level": 3}, want: true},
+		{rule: "vip_level >= 3", row: map[string]any{"vip_level": 2}, want: false},
+		{rule: "credit_score < 600", row: map[string]any{"credit_score": 580.0}, want: true},
+		{rule: "total_amount > 50000 AND age > 45", row: map[string]any{"total_amount": 60000.0, "age": 48}, want: true},
+		{rule: "total_amount > 50000 AND age > 45", row: map[string]any{"total_amount": 60000.0, "age": 30}, want: false},
+		{rule: "a = 1 OR b = 2", row: map[string]any{"a": 9, "b": 2}, want: true},
+		{rule: "a = 1 OR b = 2", row: map[string]any{"a": 9, "b": 9}, want: false},
+		{rule: "name LIKE '%店'", row: map[string]any{"name": "便利店"}, want: true},
+		{rule: "name LIKE '%码%'", row: map[string]any{"name": "数码城"}, want: true},
+		{rule: "phone IS NULL", row: map[string]any{"name": "x"}, want: true},
+		{rule: "phone IS NULL", row: map[string]any{"phone": "139"}, want: false},
+		{rule: "phone IS NOT NULL", row: map[string]any{"phone": "139"}, want: true},
+		{rule: "phone IS NOT NULL AND age >= 18", row: map[string]any{"phone": "139", "age": 20}, want: true},
 		// <> (SQL not-equal alias)
-		{"x <> 5", map[string]any{"x": 6}, true},
-		{"x <> 5", map[string]any{"x": 5}, false},
-		{"name <> '高'", map[string]any{"name": "低"}, true},
+		{rule: "x <> 5", row: map[string]any{"x": 6}, want: true},
+		{rule: "x <> 5", row: map[string]any{"x": 5}, want: false},
+		{rule: "name <> '高'", row: map[string]any{"name": "低"}, want: true},
 		// NOT IN
-		{"income_level NOT IN ('<5k','5k-10k')", map[string]any{"income_level": "20k-30k"}, true},
-		{"income_level NOT IN ('<5k','5k-10k')", map[string]any{"income_level": "<5k"}, false},
+		{rule: "income_level NOT IN ('<5k','5k-10k')", row: map[string]any{"income_level": "20k-30k"}, want: true},
+		{rule: "income_level NOT IN ('<5k','5k-10k')", row: map[string]any{"income_level": "<5k"}, want: false},
 		// NOT LIKE
-		{"occupation NOT LIKE '%学生%'", map[string]any{"occupation": "工程师"}, true},
-		{"occupation NOT LIKE '%学生%'", map[string]any{"occupation": "在校学生"}, false},
+		{rule: "occupation NOT LIKE '%学生%'", row: map[string]any{"occupation": "工程师"}, want: true},
+		{rule: "occupation NOT LIKE '%学生%'", row: map[string]any{"occupation": "在校学生"}, want: false},
 		// NOT (group)
-		{"NOT (risk_level = '高')", map[string]any{"risk_level": "低"}, true},
-		{"NOT (risk_level = '高')", map[string]any{"risk_level": "高"}, false},
-		{"NOT (a = 1 OR b = 2)", map[string]any{"a": 9, "b": 9}, true},
-		{"NOT (a = 1 OR b = 2)", map[string]any{"a": 1, "b": 9}, false},
-		{"age >= 25 AND NOT (province IN ('北京','上海'))", map[string]any{"age": 30, "province": "广东"}, true},
-		{"age >= 25 AND NOT (province IN ('北京','上海'))", map[string]any{"age": 30, "province": "北京"}, false},
+		{rule: "NOT (risk_level = '高')", row: map[string]any{"risk_level": "低"}, want: true},
+		{rule: "NOT (risk_level = '高')", row: map[string]any{"risk_level": "高"}, want: false},
+		{rule: "NOT (a = 1 OR b = 2)", row: map[string]any{"a": 9, "b": 9}, want: true},
+		{rule: "NOT (a = 1 OR b = 2)", row: map[string]any{"a": 1, "b": 9}, want: false},
+		{rule: "age >= 25 AND NOT (province IN ('北京','上海'))", row: map[string]any{"age": 30, "province": "广东"}, want: true},
+		{rule: "age >= 25 AND NOT (province IN ('北京','上海'))", row: map[string]any{"age": 30, "province": "北京"}, want: false},
 	}
 	for _, c := range cases {
 		prog, err := CompileString(c.rule)
@@ -131,13 +132,13 @@ func TestFullCoverageRule(t *testing.T) {
 		row map[string]any
 		why string
 	}{
-		{"NOT IN fails", flip(match, "income_level", "<5k")},
-		{"NOT LIKE fails", flip(match, "occupation", "在校学生")},
-		{"NOT(=高) fails", flip(match, "risk_level", "高")},
-		{"<> fails", flip(match, "marital_status", "未知")},
-		{"BETWEEN fails", flip(match, "credit_score", 999)},
-		{"OR group fails", merge(match, map[string]any{"vip_level": 1, "order_count": 2})},
-		{"IS NOT NULL fails", without(match, "last_login_time")},
+		{why: "NOT IN fails", row: flip(match, "income_level", "<5k")},
+		{why: "NOT LIKE fails", row: flip(match, "occupation", "在校学生")},
+		{why: "NOT(=高) fails", row: flip(match, "risk_level", "高")},
+		{why: "<> fails", row: flip(match, "marital_status", "未知")},
+		{why: "BETWEEN fails", row: flip(match, "credit_score", 999)},
+		{why: "OR group fails", row: merge(match, map[string]any{"vip_level": 1, "order_count": 2})},
+		{why: "IS NOT NULL fails", row: without(match, "last_login_time")},
 	}
 	for _, m := range misses {
 		if prog.Eval(m.row) {
@@ -165,12 +166,8 @@ func without(m map[string]any, k string) map[string]any {
 // merge returns a shallow copy of base with over's keys applied on top.
 func merge(base, over map[string]any) map[string]any {
 	out := make(map[string]any, len(base)+len(over))
-	for k, v := range base {
-		out[k] = v
-	}
-	for k, v := range over {
-		out[k] = v
-	}
+	maps.Copy(out, base)
+	maps.Copy(out, over)
 	return out
 }
 
@@ -289,13 +286,13 @@ func TestExplain(t *testing.T) {
 	if passed || len(reasons) == 0 {
 		t.Fatalf("miss row: passed=%v reasons=%d; want passed=false with reasons", passed, len(reasons))
 	}
-	var joined string
+	var joined strings.Builder
 	for _, r := range reasons {
-		joined += r.Expr + " — " + r.Detail + "\n"
+		joined.WriteString(r.Expr + " — " + r.Detail + "\n")
 	}
 	for _, want := range []string{"age BETWEEN", "income_level NOT IN", "occupation NOT LIKE", "last_login_time IS NOT NULL", "NOT (risk_level"} {
-		if !strings.Contains(joined, want) {
-			t.Errorf("reasons missing %q; got:\n%s", want, joined)
+		if !strings.Contains(joined.String(), want) {
+			t.Errorf("reasons missing %q; got:\n%s", want, joined.String())
 		}
 	}
 }

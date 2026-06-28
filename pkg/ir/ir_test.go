@@ -103,11 +103,11 @@ func TestIsNull(t *testing.T) {
 
 func TestParseErrors(t *testing.T) {
 	bad := []string{
-		"age >",            // missing value
-		"age BETWEEN 1",    // missing AND hi
-		"province IN ()",   // empty list -> needs value
-		"age == 1 AND",     // dangling AND
-		"@bad",             // bad char
+		"age >",          // missing value
+		"age BETWEEN 1",  // missing AND hi
+		"province IN ()", // empty list -> needs value
+		"age == 1 AND",   // dangling AND
+		"@bad",           // bad char
 	}
 	for _, r := range bad {
 		if _, err := Parse(r); err == nil {

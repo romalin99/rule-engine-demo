@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -101,7 +102,7 @@ func (s *Stats) RuleHits(nameOf func(int64) string) string {
 	for id := range s.PerRule {
 		ids = append(ids, id)
 	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	slices.Sort(ids)
 
 	var b strings.Builder
 	for _, id := range ids {

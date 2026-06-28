@@ -50,15 +50,9 @@ type lexer struct {
 
 func newLexer(s string) *lexer { return &lexer{src: []rune(s)} }
 
-func (l *lexer) peekRune() rune {
-	if l.pos >= len(l.src) {
-		return 0
-	}
-	return l.src[l.pos]
-}
-
-func (l *lexer) at(off int) rune {
-	i := l.pos + off
+// peekNext returns the rune one position past the cursor, or 0 at end of input.
+func (l *lexer) peekNext() rune {
+	i := l.pos + 1
 	if i >= len(l.src) {
 		return 0
 	}
@@ -127,31 +121,31 @@ func (l *lexer) lexOp() (token, error) {
 	r := l.src[l.pos]
 	switch r {
 	case '=':
-		if l.at(1) == '=' {
+		if l.peekNext() == '=' {
 			l.pos += 2
 			return token{Kind: tOp, Text: "==", Pos: start}, nil
 		}
 		l.pos++
 		return token{Kind: tOp, Text: "=", Pos: start}, nil
 	case '!':
-		if l.at(1) == '=' {
+		if l.peekNext() == '=' {
 			l.pos += 2
 			return token{Kind: tOp, Text: "!=", Pos: start}, nil
 		}
 		return token{}, fmt.Errorf("unexpected '!' at pos %d", start)
 	case '>':
-		if l.at(1) == '=' {
+		if l.peekNext() == '=' {
 			l.pos += 2
 			return token{Kind: tOp, Text: ">=", Pos: start}, nil
 		}
 		l.pos++
 		return token{Kind: tOp, Text: ">", Pos: start}, nil
 	case '<':
-		if l.at(1) == '=' {
+		if l.peekNext() == '=' {
 			l.pos += 2
 			return token{Kind: tOp, Text: "<=", Pos: start}, nil
 		}
-		if l.at(1) == '>' { // SQL not-equal: <> is an alias for !=
+		if l.peekNext() == '>' { // SQL not-equal: <> is an alias for !=
 			l.pos += 2
 			return token{Kind: tOp, Text: "!=", Pos: start}, nil
 		}

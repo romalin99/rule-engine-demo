@@ -2,7 +2,7 @@ package datasource
 
 import (
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"strings"
 
 	"tcg-rulex-engine/pkg/model"
@@ -38,7 +38,7 @@ type Generator struct {
 
 // NewGenerator returns a generator seeded for reproducible output.
 func NewGenerator(seed int64) *Generator {
-	return &Generator{rng: rand.New(rand.NewSource(seed))}
+	return &Generator{rng: rand.New(rand.NewPCG(uint64(seed), uint64(seed)))}
 }
 
 // Users generates n wide-table users with realistic, correlated fields. Each
@@ -46,10 +46,10 @@ func NewGenerator(seed int64) *Generator {
 // match time). Numeric fields use native int/float64 types.
 func (g *Generator) Users(n int) []model.User {
 	users := make([]model.User, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		prov := pick(g.rng, provinces)
 		city := pick(g.rng, cities[prov])
-		orderCount := g.rng.Intn(400)
+		orderCount := g.rng.IntN(400)
 		avg := 50 + g.rng.Float64()*500
 		total := float64(orderCount) * avg
 		uid := int64(i + 1)
@@ -57,16 +57,16 @@ func (g *Generator) Users(n int) []model.User {
 			"uid":               uid,
 			"username":          fmt.Sprintf("user%06d", i+1),
 			"gender":            pick(g.rng, genders),
-			"age":               18 + g.rng.Intn(50),
+			"age":               18 + g.rng.IntN(50),
 			"province":          prov,
 			"city":              city,
 			"occupation":        pick(g.rng, occupations),
 			"education":         pick(g.rng, educations),
 			"marital_status":    pick(g.rng, maritalStatus),
 			"income_level":      pick(g.rng, incomeLevels),
-			"vip_level":         g.rng.Intn(6),
-			"register_days":     g.rng.Intn(2000),
-			"login_days_30d":    g.rng.Intn(31),
+			"vip_level":         g.rng.IntN(6),
+			"register_days":     g.rng.IntN(2000),
+			"login_days_30d":    g.rng.IntN(31),
 			"order_count":       orderCount,
 			"total_amount":      round2(total),
 			"avg_order_amount":  round2(avg),
@@ -76,7 +76,7 @@ func (g *Generator) Users(n int) []model.User {
 			"browser":           pick(g.rng, browsers),
 			"app_version":       pick(g.rng, appVersions),
 			"active_score":      round2(g.rng.Float64() * 100),
-			"credit_score":      400 + g.rng.Intn(450),
+			"credit_score":      400 + g.rng.IntN(450),
 			"risk_level":        pick(g.rng, riskLevels),
 			"tag1":              pick(g.rng, tagPool),
 			"tag2":              pick(g.rng, tagPool),
@@ -92,8 +92,8 @@ func (g *Generator) Users(n int) []model.User {
 // and exercises =, >=, <, BETWEEN, IN and LIKE.
 func (g *Generator) Rules(n int) []model.Rule {
 	rules := make([]model.Rule, n)
-	for i := 0; i < n; i++ {
-		nPred := 2 + g.rng.Intn(4) // 2..5 predicates
+	for i := range n {
+		nPred := 2 + g.rng.IntN(4) // 2..5 predicates
 		preds := make([]string, 0, nPred)
 		seen := map[string]bool{}
 		for len(preds) < nPred {
@@ -108,7 +108,7 @@ func (g *Generator) Rules(n int) []model.Rule {
 			ID:       int64(10000 + i),
 			Name:     fmt.Sprintf("rule_%05d", i),
 			Expr:     strings.Join(preds, " AND "),
-			Priority: g.rng.Intn(20),
+			Priority: g.rng.IntN(20),
 			Enabled:  true,
 		}
 	}
@@ -118,37 +118,37 @@ func (g *Generator) Rules(n int) []model.Rule {
 // predicate returns a single random predicate plus a key identifying its field
 // (so a rule does not contain two predicates on the same field).
 func (g *Generator) predicate() (expr string, key string) {
-	switch g.rng.Intn(11) {
+	switch g.rng.IntN(11) {
 	case 0:
-		lo := 18 + g.rng.Intn(30)
-		hi := lo + 5 + g.rng.Intn(20)
+		lo := 18 + g.rng.IntN(30)
+		hi := lo + 5 + g.rng.IntN(20)
 		return fmt.Sprintf("age BETWEEN %d AND %d", lo, hi), "age"
 	case 1:
-		return fmt.Sprintf("province IN (%s)", inList(pickN(g.rng, provinces, 1+g.rng.Intn(3)))), "province"
+		return fmt.Sprintf("province IN (%s)", inList(pickN(g.rng, provinces, 1+g.rng.IntN(3)))), "province"
 	case 2:
-		return fmt.Sprintf("income_level IN (%s)", inList(pickN(g.rng, incomeLevels, 1+g.rng.Intn(3)))), "income_level"
+		return fmt.Sprintf("income_level IN (%s)", inList(pickN(g.rng, incomeLevels, 1+g.rng.IntN(3)))), "income_level"
 	case 3:
 		return "favorite_category LIKE '数%'", "favorite_category"
 	case 4:
-		return fmt.Sprintf("active_score >= %d", 50+g.rng.Intn(50)), "active_score"
+		return fmt.Sprintf("active_score >= %d", 50+g.rng.IntN(50)), "active_score"
 	case 5:
-		return fmt.Sprintf("vip_level >= %d", 1+g.rng.Intn(4)), "vip_level"
+		return fmt.Sprintf("vip_level >= %d", 1+g.rng.IntN(4)), "vip_level"
 	case 6:
 		return fmt.Sprintf("gender = '%s'", pick(g.rng, genders)), "gender"
 	case 7:
-		return fmt.Sprintf("total_amount > %d", 1000*g.rng.Intn(60)), "total_amount"
+		return fmt.Sprintf("total_amount > %d", 1000*g.rng.IntN(60)), "total_amount"
 	case 8:
-		return fmt.Sprintf("login_days_30d >= %d", g.rng.Intn(25)), "login_days_30d"
+		return fmt.Sprintf("login_days_30d >= %d", g.rng.IntN(25)), "login_days_30d"
 	case 9:
 		return fmt.Sprintf("risk_level = '%s'", pick(g.rng, riskLevels)), "risk_level"
 	default:
-		return fmt.Sprintf("credit_score < %d", 500+g.rng.Intn(350)), "credit_score"
+		return fmt.Sprintf("credit_score < %d", 500+g.rng.IntN(350)), "credit_score"
 	}
 }
 
 // --- helpers ---
 
-func pick[T any](r *rand.Rand, xs []T) T { return xs[r.Intn(len(xs))] }
+func pick[T any](r *rand.Rand, xs []T) T { return xs[r.IntN(len(xs))] }
 
 // pickN returns up to k distinct elements from xs.
 func pickN(r *rand.Rand, xs []string, k int) []string {

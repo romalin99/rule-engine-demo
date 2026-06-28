@@ -37,7 +37,6 @@ func BenchmarkBackends(b *testing.B) {
 	}
 
 	for name, eng := range backends {
-		eng := eng
 		b.Run(name, func(b *testing.B) {
 			var stats *engine.Stats
 			b.ResetTimer()

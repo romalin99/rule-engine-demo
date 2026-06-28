@@ -20,147 +20,34 @@ func (p *Program) Eval(row map[string]any) bool {
 		in := p.Code[i]
 		switch in.Op {
 
-		case OpLoadField:
+		case OpLoadField, OpConstNum, OpConstStr: // push one value
 			if sp >= stackMax {
 				return false
 			}
-			if raw, ok := row[p.Fields[in.A]]; ok {
-				st[sp] = toValue(raw)
-			} else {
-				st[sp] = undef
-			}
+			st[sp] = p.load(in, row)
 			sp++
 
-		case OpConstNum:
-			if sp >= stackMax {
-				return false
-			}
-			st[sp] = numV(p.Nums[in.A])
-			sp++
-
-		case OpConstStr:
-			if sp >= stackMax {
-				return false
-			}
-			st[sp] = strV(p.Strs[in.A])
-			sp++
-
-		case OpEq, OpNe, OpGt, OpGe, OpLt, OpLe:
-			if sp < 2 {
-				return false
-			}
-			b := st[sp-1]
-			a := st[sp-2]
-			sp -= 2
-			st[sp] = boolV(compare(a, b, in.Op))
-			sp++
-
-		case OpBetween:
+		case OpBetween: // pop hi,lo,x -> push lo <= x <= hi
 			if sp < 3 {
 				return false
 			}
-			hi := st[sp-1]
-			lo := st[sp-2]
-			x := st[sp-3]
-			sp -= 3
-			res := x.k == kNum && lo.k == kNum && hi.k == kNum && lo.n <= x.n && x.n <= hi.n
-			st[sp] = boolV(res)
-			sp++
+			x, lo, hi := st[sp-3], st[sp-2], st[sp-1]
+			sp -= 2
+			st[sp-1] = boolV(x.k == kNum && lo.k == kNum && hi.k == kNum && lo.n <= x.n && x.n <= hi.n)
 
-		case OpIn:
-			if sp < 1 {
-				return false
-			}
-			x := st[sp-1]
-			sp--
-			_, ok := p.Sets[in.A][x.asString()]
-			st[sp] = boolV(ok && x.k != kUndef)
-			sp++
-
-		case OpLikePrefix:
-			if sp < 1 {
-				return false
-			}
-			x := st[sp-1]
-			sp--
-			st[sp] = boolV(x.k != kUndef && strings.HasPrefix(x.asString(), p.Strs[in.A]))
-			sp++
-
-		case OpLikeSuffix:
-			if sp < 1 {
-				return false
-			}
-			x := st[sp-1]
-			sp--
-			st[sp] = boolV(x.k != kUndef && strings.HasSuffix(x.asString(), p.Strs[in.A]))
-			sp++
-
-		case OpLikeContains:
-			if sp < 1 {
-				return false
-			}
-			x := st[sp-1]
-			sp--
-			st[sp] = boolV(x.k != kUndef && strings.Contains(x.asString(), p.Strs[in.A]))
-			sp++
-
-		case OpLikeEq:
-			if sp < 1 {
-				return false
-			}
-			x := st[sp-1]
-			sp--
-			st[sp] = boolV(x.k != kUndef && x.asString() == p.Strs[in.A])
-			sp++
-
-		case OpIsNull:
-			if sp < 1 {
-				return false
-			}
-			x := st[sp-1]
-			sp--
-			st[sp] = boolV(x.k == kUndef)
-			sp++
-
-		case OpIsNotNull:
-			if sp < 1 {
-				return false
-			}
-			x := st[sp-1]
-			sp--
-			st[sp] = boolV(x.k != kUndef)
-			sp++
-
-		case OpAnd:
+		case OpEq, OpNe, OpGt, OpGe, OpLt, OpLe, OpAnd, OpOr: // pop b,a -> push result
 			if sp < 2 {
 				return false
 			}
-			b := st[sp-1]
-			a := st[sp-2]
-			sp -= 2
-			st[sp] = boolV(a.b && b.b)
-			sp++
+			a, b := st[sp-2], st[sp-1]
+			sp--
+			st[sp-1] = boolV(binaryOp(in.Op, a, b))
 
-		case OpOr:
-			if sp < 2 {
-				return false
-			}
-			b := st[sp-1]
-			a := st[sp-2]
-			sp -= 2
-			st[sp] = boolV(a.b || b.b)
-			sp++
-
-		case OpNot:
+		case OpIn, OpLikePrefix, OpLikeSuffix, OpLikeContains, OpLikeEq, OpIsNull, OpIsNotNull, OpNot: // pop x -> push result
 			if sp < 1 {
 				return false
 			}
-			a := st[sp-1]
-			sp--
-			// Negate a boolean result; anything non-boolean is treated as false
-			// (so !non-bool stays false rather than silently becoming true).
-			st[sp] = boolV(a.k == kBool && !a.b)
-			sp++
+			st[sp-1] = boolV(p.unaryOp(in, st[sp-1]))
 
 		default:
 			return false
@@ -171,6 +58,63 @@ func (p *Program) Eval(row map[string]any) bool {
 		return false
 	}
 	return st[0].b
+}
+
+// load produces the value pushed by a load/const opcode (OpLoadField,
+// OpConstNum, OpConstStr). A missing field yields undef.
+func (p *Program) load(in Instr, row map[string]any) Value {
+	switch in.Op {
+	case OpConstNum:
+		return numV(p.Nums[in.A])
+	case OpConstStr:
+		return strV(p.Strs[in.A])
+	default: // OpLoadField
+		if raw, ok := row[p.Fields[in.A]]; ok {
+			return toValue(raw)
+		}
+		return undef
+	}
+}
+
+// binaryOp evaluates a two-operand opcode: the boolean combinators AND/OR, with
+// every comparison delegated to compare.
+func binaryOp(op OpCode, a, b Value) bool {
+	switch op {
+	case OpAnd:
+		return a.b && b.b
+	case OpOr:
+		return a.b || b.b
+	default:
+		return compare(a, b, op)
+	}
+}
+
+// unaryOp evaluates a single-operand opcode (set membership, the LIKE variants,
+// the IS [NOT] NULL pair, and NOT) against the top-of-stack value x.
+func (p *Program) unaryOp(in Instr, x Value) bool {
+	switch in.Op {
+	case OpIn:
+		_, ok := p.Sets[in.A][x.asString()]
+		return ok && x.k != kUndef
+	case OpLikePrefix:
+		return x.k != kUndef && strings.HasPrefix(x.asString(), p.Strs[in.A])
+	case OpLikeSuffix:
+		return x.k != kUndef && strings.HasSuffix(x.asString(), p.Strs[in.A])
+	case OpLikeContains:
+		return x.k != kUndef && strings.Contains(x.asString(), p.Strs[in.A])
+	case OpLikeEq:
+		return x.k != kUndef && x.asString() == p.Strs[in.A]
+	case OpIsNull:
+		return x.k == kUndef
+	case OpIsNotNull:
+		return x.k != kUndef
+	case OpNot:
+		// Negate a boolean result; anything non-boolean is treated as false
+		// (so !non-bool stays false rather than silently becoming true).
+		return x.k == kBool && !x.b
+	default:
+		return false
+	}
 }
 
 // compare evaluates an ordering/equality opcode on two values.
