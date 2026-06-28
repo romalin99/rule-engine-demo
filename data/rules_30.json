@@ -1,0 +1,212 @@
+[
+  {
+    "id": 2001,
+    "name": "旗舰全算子门禁",
+    "priority": 20,
+    "enabled": true,
+    "expr": "age BETWEEN 25 AND 40 AND province IN ('广东','江苏','浙江') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '数%' AND occupation NOT LIKE '%学生%' AND active_score >= 85 AND credit_score BETWEEN 700 AND 850 AND total_amount > 5000 AND avg_order_amount <= 1000 AND last_login_time IS NOT NULL AND (vip_level >= 3 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
+  },
+  {
+    "id": 2002,
+    "name": "年龄区间",
+    "priority": 10,
+    "enabled": true,
+    "expr": "age BETWEEN 25 AND 40"
+  },
+  {
+    "id": 2003,
+    "name": "年龄下限",
+    "priority": 10,
+    "enabled": true,
+    "expr": "age >= 25"
+  },
+  {
+    "id": 2004,
+    "name": "年龄上限",
+    "priority": 10,
+    "enabled": true,
+    "expr": "age <= 40"
+  },
+  {
+    "id": 2005,
+    "name": "目标省份",
+    "priority": 10,
+    "enabled": true,
+    "expr": "province IN ('广东','江苏','浙江')"
+  },
+  {
+    "id": 2006,
+    "name": "收入非低档",
+    "priority": 10,
+    "enabled": true,
+    "expr": "income_level NOT IN ('<5k','5k-10k')"
+  },
+  {
+    "id": 2007,
+    "name": "数码偏好",
+    "priority": 10,
+    "enabled": true,
+    "expr": "favorite_category LIKE '数%'"
+  },
+  {
+    "id": 2008,
+    "name": "非学生",
+    "priority": 10,
+    "enabled": true,
+    "expr": "occupation NOT LIKE '%学生%'"
+  },
+  {
+    "id": 2009,
+    "name": "高活跃",
+    "priority": 10,
+    "enabled": true,
+    "expr": "active_score >= 85"
+  },
+  {
+    "id": 2010,
+    "name": "信用区间",
+    "priority": 10,
+    "enabled": true,
+    "expr": "credit_score BETWEEN 700 AND 850"
+  },
+  {
+    "id": 2011,
+    "name": "信用下限",
+    "priority": 10,
+    "enabled": true,
+    "expr": "credit_score >= 700"
+  },
+  {
+    "id": 2012,
+    "name": "信用上限",
+    "priority": 10,
+    "enabled": true,
+    "expr": "credit_score <= 850"
+  },
+  {
+    "id": 2013,
+    "name": "高消费",
+    "priority": 10,
+    "enabled": true,
+    "expr": "total_amount > 5000"
+  },
+  {
+    "id": 2014,
+    "name": "小额客单",
+    "priority": 10,
+    "enabled": true,
+    "expr": "avg_order_amount <= 1000"
+  },
+  {
+    "id": 2015,
+    "name": "有登录时间",
+    "priority": 10,
+    "enabled": true,
+    "expr": "last_login_time IS NOT NULL"
+  },
+  {
+    "id": 2016,
+    "name": "会员等级",
+    "priority": 10,
+    "enabled": true,
+    "expr": "vip_level >= 3"
+  },
+  {
+    "id": 2017,
+    "name": "会员或高频",
+    "priority": 10,
+    "enabled": true,
+    "expr": "(vip_level >= 3 OR order_count >= 30)"
+  },
+  {
+    "id": 2018,
+    "name": "非高风险(NOT)",
+    "priority": 10,
+    "enabled": true,
+    "expr": "NOT (risk_level = '高')"
+  },
+  {
+    "id": 2019,
+    "name": "非高风险(<>)",
+    "priority": 10,
+    "enabled": true,
+    "expr": "risk_level <> '高'"
+  },
+  {
+    "id": 2020,
+    "name": "老用户",
+    "priority": 10,
+    "enabled": true,
+    "expr": "register_days >= 180"
+  },
+  {
+    "id": 2021,
+    "name": "婚况已知",
+    "priority": 10,
+    "enabled": true,
+    "expr": "marital_status <> '未知'"
+  },
+  {
+    "id": 2022,
+    "name": "活跃成年",
+    "priority": 10,
+    "enabled": true,
+    "expr": "age BETWEEN 25 AND 40 AND active_score >= 85"
+  },
+  {
+    "id": 2023,
+    "name": "省份高信用",
+    "priority": 10,
+    "enabled": true,
+    "expr": "province IN ('广东','江苏','浙江') AND credit_score BETWEEN 700 AND 850"
+  },
+  {
+    "id": 2024,
+    "name": "数码非学生",
+    "priority": 10,
+    "enabled": true,
+    "expr": "favorite_category LIKE '数%' AND occupation NOT LIKE '%学生%'"
+  },
+  {
+    "id": 2025,
+    "name": "高消费小客单",
+    "priority": 10,
+    "enabled": true,
+    "expr": "total_amount > 5000 AND avg_order_amount <= 1000"
+  },
+  {
+    "id": 2026,
+    "name": "会员老用户",
+    "priority": 10,
+    "enabled": true,
+    "expr": "vip_level >= 3 AND register_days >= 180"
+  },
+  {
+    "id": 2027,
+    "name": "低风险已知婚况",
+    "priority": 10,
+    "enabled": true,
+    "expr": "NOT (risk_level = '高') AND marital_status <> '未知'"
+  },
+  {
+    "id": 2028,
+    "name": "中高收入高活跃",
+    "priority": 10,
+    "enabled": true,
+    "expr": "income_level NOT IN ('<5k','5k-10k') AND active_score >= 85"
+  },
+  {
+    "id": 2029,
+    "name": "核心圈选",
+    "priority": 10,
+    "enabled": true,
+    "expr": "age BETWEEN 25 AND 40 AND province IN ('广东','江苏','浙江') AND vip_level >= 3"
+  },
+  {
+    "id": 2030,
+    "name": "信用消费登录",
+    "priority": 10,
+    "enabled": true,
+    "expr": "credit_score BETWEEN 700 AND 850 AND total_amount > 5000 AND last_login_time IS NOT NULL"
+  }
+]
