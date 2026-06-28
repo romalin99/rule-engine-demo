@@ -66,8 +66,10 @@ const Page = `<!doctype html>
   </section>
 </main>
 <script>
+// API base path — must match router.BasePath (the rule API is served under this group).
+var BASE = '/tcg-rulex-engine';
 function j(url, method, body){
-  return fetch(url, {method:method||'GET', headers:{'Content-Type':'application/json'},
+  return fetch(BASE+url, {method:method||'GET', headers:{'Content-Type':'application/json'},
     body: body?JSON.stringify(body):undefined}).then(function(r){return r.json().then(function(d){return {ok:r.ok,d:d}})});
 }
 function show(msg, good){

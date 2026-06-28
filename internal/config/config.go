@@ -30,7 +30,6 @@ type OracleConnectInfo struct {
 	OracledbUser            string `json:"oracledb.user"`
 	OracledbPassword        string `json:"oracledb.password"`
 	OracledbConnectStringer string `json:"oracledb.uconnectStringer"`
-	MongodbConnectStringer  string `json:"mongodb.connectStringer"`
 }
 
 type AppTimeouts struct {

@@ -21,8 +21,8 @@ import (
 // Each worker writes into a distinct results slot (no locking) and keeps its own
 // hit counters, merged once at the end. Compiled ASTs are shared read-only.
 type Pool struct {
-	workers int
 	eng     *Engine
+	workers int
 }
 
 // NewPool returns a pool. workers <= 0 defaults to GOMAXPROCS.
@@ -31,8 +31,8 @@ func NewPool(workers int, eng *Engine) *Pool {
 }
 
 type job struct {
-	idx  int
 	user model.User
+	idx  int
 }
 
 // Run scores every user against every rule and returns per-user results plus
@@ -61,8 +61,8 @@ func (p *Pool) Run(users []model.User, rules []*model.RuleProgram) ([]model.User
 
 	jobs := make(chan job, workers*2)
 	partials := make([]struct {
-		hits    int64
 		perRule map[int64]int64
+		hits    int64
 	}, workers)
 
 	var wg sync.WaitGroup

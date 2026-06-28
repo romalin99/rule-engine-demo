@@ -8,8 +8,8 @@ import (
 
 // UserStore is an in-memory collection of users with a UID index.
 type UserStore struct {
+	index map[int64]int
 	users []model.User
-	index map[int64]int // uid -> position in users
 }
 
 // NewUserStore returns an empty store.

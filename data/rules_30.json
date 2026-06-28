@@ -4,6 +4,7 @@
     "name": "旗舰全算子门禁",
     "priority": 20,
     "enabled": true,
+    "comment": "旗舰全算子门禁；覆盖算子: BETWEEN、IN、NOT IN、LIKE、NOT LIKE、IS NOT NULL、<>、OR、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "age BETWEEN 25 AND 40 AND province IN ('广东','江苏','浙江') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '数%' AND occupation NOT LIKE '%学生%' AND active_score >= 85 AND credit_score BETWEEN 700 AND 850 AND total_amount > 5000 AND avg_order_amount <= 1000 AND last_login_time IS NOT NULL AND (vip_level >= 3 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
   },
   {
@@ -11,6 +12,7 @@
     "name": "年龄区间",
     "priority": 10,
     "enabled": true,
+    "comment": "年龄区间；覆盖算子: BETWEEN；仅基础算子，qlbridge / native 前端均可。",
     "expr": "age BETWEEN 25 AND 40"
   },
   {
@@ -18,6 +20,7 @@
     "name": "年龄下限",
     "priority": 10,
     "enabled": true,
+    "comment": "年龄下限；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "age >= 25"
   },
   {
@@ -25,6 +28,7 @@
     "name": "年龄上限",
     "priority": 10,
     "enabled": true,
+    "comment": "年龄上限；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "age <= 40"
   },
   {
@@ -32,6 +36,7 @@
     "name": "目标省份",
     "priority": 10,
     "enabled": true,
+    "comment": "目标省份；覆盖算子: IN；仅基础算子，qlbridge / native 前端均可。",
     "expr": "province IN ('广东','江苏','浙江')"
   },
   {
@@ -39,6 +44,7 @@
     "name": "收入非低档",
     "priority": 10,
     "enabled": true,
+    "comment": "收入非低档；覆盖算子: NOT IN、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "income_level NOT IN ('<5k','5k-10k')"
   },
   {
@@ -46,6 +52,7 @@
     "name": "数码偏好",
     "priority": 10,
     "enabled": true,
+    "comment": "数码偏好；覆盖算子: LIKE；仅基础算子，qlbridge / native 前端均可。",
     "expr": "favorite_category LIKE '数%'"
   },
   {
@@ -53,6 +60,7 @@
     "name": "非学生",
     "priority": 10,
     "enabled": true,
+    "comment": "非学生；覆盖算子: NOT LIKE；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "occupation NOT LIKE '%学生%'"
   },
   {
@@ -60,6 +68,7 @@
     "name": "高活跃",
     "priority": 10,
     "enabled": true,
+    "comment": "高活跃；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "active_score >= 85"
   },
   {
@@ -67,6 +76,7 @@
     "name": "信用区间",
     "priority": 10,
     "enabled": true,
+    "comment": "信用区间；覆盖算子: BETWEEN；仅基础算子，qlbridge / native 前端均可。",
     "expr": "credit_score BETWEEN 700 AND 850"
   },
   {
@@ -74,6 +84,7 @@
     "name": "信用下限",
     "priority": 10,
     "enabled": true,
+    "comment": "信用下限；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "credit_score >= 700"
   },
   {
@@ -81,6 +92,7 @@
     "name": "信用上限",
     "priority": 10,
     "enabled": true,
+    "comment": "信用上限；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "credit_score <= 850"
   },
   {
@@ -88,6 +100,7 @@
     "name": "高消费",
     "priority": 10,
     "enabled": true,
+    "comment": "高消费；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "total_amount > 5000"
   },
   {
@@ -95,6 +108,7 @@
     "name": "小额客单",
     "priority": 10,
     "enabled": true,
+    "comment": "小额客单；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "avg_order_amount <= 1000"
   },
   {
@@ -102,6 +116,7 @@
     "name": "有登录时间",
     "priority": 10,
     "enabled": true,
+    "comment": "有登录时间；覆盖算子: IS NOT NULL；仅基础算子，qlbridge / native 前端均可。",
     "expr": "last_login_time IS NOT NULL"
   },
   {
@@ -109,6 +124,7 @@
     "name": "会员等级",
     "priority": 10,
     "enabled": true,
+    "comment": "会员等级；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "vip_level >= 3"
   },
   {
@@ -116,6 +132,7 @@
     "name": "会员或高频",
     "priority": 10,
     "enabled": true,
+    "comment": "会员或高频；覆盖算子: OR、比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "(vip_level >= 3 OR order_count >= 30)"
   },
   {
@@ -123,6 +140,7 @@
     "name": "非高风险(NOT)",
     "priority": 10,
     "enabled": true,
+    "comment": "非高风险(NOT)；覆盖算子: NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "NOT (risk_level = '高')"
   },
   {
@@ -130,6 +148,7 @@
     "name": "非高风险(<>)",
     "priority": 10,
     "enabled": true,
+    "comment": "非高风险(<>)；覆盖算子: <>、比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "risk_level <> '高'"
   },
   {
@@ -137,6 +156,7 @@
     "name": "老用户",
     "priority": 10,
     "enabled": true,
+    "comment": "老用户；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "register_days >= 180"
   },
   {
@@ -144,6 +164,7 @@
     "name": "婚况已知",
     "priority": 10,
     "enabled": true,
+    "comment": "婚况已知；覆盖算子: <>、比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "marital_status <> '未知'"
   },
   {
@@ -151,6 +172,7 @@
     "name": "活跃成年",
     "priority": 10,
     "enabled": true,
+    "comment": "活跃成年；覆盖算子: BETWEEN、比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "age BETWEEN 25 AND 40 AND active_score >= 85"
   },
   {
@@ -158,6 +180,7 @@
     "name": "省份高信用",
     "priority": 10,
     "enabled": true,
+    "comment": "省份高信用；覆盖算子: BETWEEN、IN；仅基础算子，qlbridge / native 前端均可。",
     "expr": "province IN ('广东','江苏','浙江') AND credit_score BETWEEN 700 AND 850"
   },
   {
@@ -165,6 +188,7 @@
     "name": "数码非学生",
     "priority": 10,
     "enabled": true,
+    "comment": "数码非学生；覆盖算子: LIKE、NOT LIKE；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "favorite_category LIKE '数%' AND occupation NOT LIKE '%学生%'"
   },
   {
@@ -172,6 +196,7 @@
     "name": "高消费小客单",
     "priority": 10,
     "enabled": true,
+    "comment": "高消费小客单；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "total_amount > 5000 AND avg_order_amount <= 1000"
   },
   {
@@ -179,6 +204,7 @@
     "name": "会员老用户",
     "priority": 10,
     "enabled": true,
+    "comment": "会员老用户；覆盖算子: 比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "vip_level >= 3 AND register_days >= 180"
   },
   {
@@ -186,6 +212,7 @@
     "name": "低风险已知婚况",
     "priority": 10,
     "enabled": true,
+    "comment": "低风险已知婚况；覆盖算子: <>、NOT(...)、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "NOT (risk_level = '高') AND marital_status <> '未知'"
   },
   {
@@ -193,6 +220,7 @@
     "name": "中高收入高活跃",
     "priority": 10,
     "enabled": true,
+    "comment": "中高收入高活跃；覆盖算子: NOT IN、比较；含取反算子(NOT IN/NOT LIKE/NOT(...))，需原生 SQL 前端 -frontend native。",
     "expr": "income_level NOT IN ('<5k','5k-10k') AND active_score >= 85"
   },
   {
@@ -200,6 +228,7 @@
     "name": "核心圈选",
     "priority": 10,
     "enabled": true,
+    "comment": "核心圈选；覆盖算子: BETWEEN、IN、比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "age BETWEEN 25 AND 40 AND province IN ('广东','江苏','浙江') AND vip_level >= 3"
   },
   {
@@ -207,6 +236,7 @@
     "name": "信用消费登录",
     "priority": 10,
     "enabled": true,
+    "comment": "信用消费登录；覆盖算子: BETWEEN、IS NOT NULL、比较；仅基础算子，qlbridge / native 前端均可。",
     "expr": "credit_score BETWEEN 700 AND 850 AND total_amount > 5000 AND last_login_time IS NOT NULL"
   }
 ]

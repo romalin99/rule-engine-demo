@@ -13,8 +13,8 @@ import "encoding/json"
 //	    Fields map[string]any
 //	}
 type User struct {
-	UID    int64
 	Fields map[string]any
+	UID    int64
 }
 
 // NewUser builds a user from an id and its fields.

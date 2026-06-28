@@ -11,11 +11,11 @@ import (
 // modification time changes. Reloads are atomic (ReplaceRules), so in-flight
 // matching keeps using the previous rule set until the swap completes.
 type Watcher struct {
+	last     time.Time
 	eng      *Engine
+	onReload func(loaded, failed int, err error)
 	path     string
 	interval time.Duration
-	last     time.Time
-	onReload func(loaded, failed int, err error)
 }
 
 // NewWatcher creates a watcher for path, polling every interval.

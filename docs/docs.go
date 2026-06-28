@@ -17,18 +17,17 @@ const docTemplate = `{
     "paths": {
         "/": {
             "get": {
-                "description": "返回运维控制台 Web 页面（HTML），用于在线增删改查 / 测试 / 发布规则。",
+                "description": "返回单文件 HTML 规则编辑器（运维控制台）页面。",
                 "produces": [
                     "text/html"
                 ],
                 "tags": [
-                    "Console"
+                    "console"
                 ],
-                "summary": "规则编辑器控制台",
-                "operationId": "editor",
+                "summary": "运维控制台",
                 "responses": {
                     "200": {
-                        "description": "HTML 页面",
+                        "description": "HTML page",
                         "schema": {
                             "type": "string"
                         }
@@ -38,7 +37,7 @@ const docTemplate = `{
         },
         "/evaluate": {
             "post": {
-                "description": "将一个宽表用户行在单条规则树上求值，返回是否通过 passed，以及导致未通过的谓词原因列表 reasons（passed=true 时为空）。\n- rule：可选，SQL 规则文本；省略时使用内置 flagship 规则\n- rule_id：可选，对已加载的规则按 ID 取其表达式进行解释（仅当 rule 为空时生效）\n- row：宽表用户字段",
+                "description": "对一条规则（rule 文本优先，其次 rule_id，否则内置旗舰规则）评估给定 row，返回是否通过及失败原因。",
                 "consumes": [
                     "application/json"
                 ],
@@ -46,14 +45,13 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Scoring"
+                    "scoring"
                 ],
-                "summary": "单规则评估并解释",
-                "operationId": "evaluate",
+                "summary": "单规则评估",
                 "parameters": [
                     {
                         "description": "评估请求",
-                        "name": "body",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -63,19 +61,59 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "评估结果（passed + reasons）",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.EvaluateResponse"
                         }
                     },
                     "400": {
-                        "description": "JSON 解析或规则解析失败",
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "rule_id 未加载",
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/router.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/evaluate/all": {
+            "post": {
+                "description": "将一条 row 对所有已加载规则评估（门控语义）：仅当满足全部规则时 passed 为 true，否则列出每条未满足的规则及原因。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "scoring"
+                ],
+                "summary": "全规则评估（门控）",
+                "parameters": [
+                    {
+                        "description": "全规则评估请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/router.EvaluateAllRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/router.EvaluateAllResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -85,18 +123,17 @@ const docTemplate = `{
         },
         "/healthz": {
             "get": {
-                "description": "返回服务存活状态与当前已编译规则数。",
+                "description": "返回服务健康状态与当前已加载规则数。",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "System"
+                    "probes"
                 ],
                 "summary": "健康检查",
-                "operationId": "health_check",
                 "responses": {
                     "200": {
-                        "description": "服务正常",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.HealthResponse"
                         }
@@ -106,7 +143,7 @@ const docTemplate = `{
         },
         "/match": {
             "post": {
-                "description": "传入一个宽表用户对象（任意列，见 data/users.json 样例），返回命中的规则 ID、规则名与耗时。并发受引擎信号量限制，超出将排队。",
+                "description": "对单个宽表用户记录进行评分，返回命中的规则 ID 与名称。",
                 "consumes": [
                     "application/json"
                 ],
@@ -114,13 +151,12 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Scoring"
+                    "scoring"
                 ],
-                "summary": "单用户实时评分",
-                "operationId": "match_single",
+                "summary": "在线评分（单用户）",
                 "parameters": [
                     {
-                        "description": "宽表用户对象（允许任意附加字段）",
+                        "description": "用户宽表记录（允许附加任意列）",
                         "name": "user",
                         "in": "body",
                         "required": true,
@@ -131,13 +167,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "命中结果",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.MatchResponse"
                         }
                     },
                     "400": {
-                        "description": "请求体 JSON 解析失败",
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -147,7 +183,7 @@ const docTemplate = `{
         },
         "/match/batch": {
             "post": {
-                "description": "传入用户对象数组（顶层 JSON 数组），按顺序返回每个用户的命中结果。整批受引擎并发上限约束。",
+                "description": "对一组宽表用户记录批量评分，返回每个用户的命中结果数组。",
                 "consumes": [
                     "application/json"
                 ],
@@ -155,13 +191,12 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Scoring"
+                    "scoring"
                 ],
-                "summary": "批量用户实时评分",
-                "operationId": "match_batch",
+                "summary": "在线评分（批量）",
                 "parameters": [
                     {
-                        "description": "用户对象数组",
+                        "description": "用户宽表记录数组",
                         "name": "users",
                         "in": "body",
                         "required": true,
@@ -175,7 +210,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "逐用户命中结果",
+                        "description": "OK",
                         "schema": {
                             "type": "array",
                             "items": {
@@ -184,7 +219,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "请求体 JSON 解析失败",
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -194,18 +229,17 @@ const docTemplate = `{
         },
         "/metrics": {
             "get": {
-                "description": "以 Prometheus 文本曝光格式输出引擎指标：规则数、版本数、在判用户数、并发上限，以及最近窗口的 /match 延迟分位（p50/p90/p99）。",
+                "description": "以 Prometheus 文本曝光格式返回引擎指标：规则数、版本数、在飞用户数、并发上限与最近 /match 延迟分位数。",
                 "produces": [
                     "text/plain"
                 ],
                 "tags": [
-                    "System"
+                    "probes"
                 ],
                 "summary": "Prometheus 指标",
-                "operationId": "metrics",
                 "responses": {
                     "200": {
-                        "description": "Prometheus 文本格式指标",
+                        "description": "Prometheus exposition text",
                         "schema": {
                             "type": "string"
                         }
@@ -213,22 +247,21 @@ const docTemplate = `{
                 }
             }
         },
-        "/ping2": {
+        "/ping": {
             "get": {
-                "description": "轻量存活探针，固定返回 {\"ping\":\"pong2\"}。",
+                "description": "轻量存活探针，返回 {\"ping\":\"pong\"}。",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "System"
+                    "probes"
                 ],
                 "summary": "存活探针",
-                "operationId": "ping",
                 "responses": {
                     "200": {
-                        "description": "pong2",
+                        "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/router.Ping2Response"
+                            "$ref": "#/definitions/router.PingResponse"
                         }
                     }
                 }
@@ -236,18 +269,17 @@ const docTemplate = `{
         },
         "/rules": {
             "get": {
-                "description": "返回当前引擎已加载并编译的规则总数。",
+                "description": "返回当前已加载（生效）规则的数量。",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "System"
+                    "scoring"
                 ],
                 "summary": "规则数量",
-                "operationId": "rule_count",
                 "responses": {
                     "200": {
-                        "description": "规则总数",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.RuleCountResponse"
                         }
@@ -255,7 +287,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "新增或按 ID 更新一条规则并即时生效（原子重建缓存）。表达式字段名为 \"rule\"（SQL 文本）。",
+                "description": "新增或更新一条规则并立即生效（热更新）。",
                 "consumes": [
                     "application/json"
                 ],
@@ -263,10 +295,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Rules"
+                    "rules"
                 ],
-                "summary": "新增 / 更新规则（热生效）",
-                "operationId": "rule_upsert",
+                "summary": "新增/更新规则",
                 "parameters": [
                     {
                         "description": "规则对象",
@@ -280,13 +311,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "写入成功，返回规则总数",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.UpsertResponse"
                         }
                     },
                     "400": {
-                        "description": "规则 JSON 非法或编译失败",
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -296,18 +327,17 @@ const docTemplate = `{
         },
         "/rules/list": {
             "get": {
-                "description": "返回当前可编辑的全部规则。",
+                "description": "返回全部可编辑规则。",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Rules"
+                    "rules"
                 ],
                 "summary": "规则列表",
-                "operationId": "rule_list",
                 "responses": {
                     "200": {
-                        "description": "规则列表",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.RuleListResponse"
                         }
@@ -317,7 +347,7 @@ const docTemplate = `{
         },
         "/rules/selftest": {
             "post": {
-                "description": "对运行中的引擎证明复杂规则的热增 / 热删：评分 → 热加规则（应命中）→ 热删规则（应消失），返回逐步轨迹与两个布尔证明。rule 与 row 均可省略（使用内置 flagship 规则与样例）。",
+                "description": "验证一条复杂规则的实时新增与删除。请求体可选（{rule,row}），缺省时使用内置旗舰规则与样例用户。",
                 "consumes": [
                     "application/json"
                 ],
@@ -325,14 +355,13 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Rules"
+                    "rules"
                 ],
-                "summary": "规则热增删自检",
-                "operationId": "rule_selftest",
+                "summary": "自检（热增删验证）",
                 "parameters": [
                     {
-                        "description": "可选：自定义规则与样例行",
-                        "name": "body",
+                        "description": "自检请求（可选）",
+                        "name": "request",
                         "in": "body",
                         "schema": {
                             "$ref": "#/definitions/router.SelfTestRequest"
@@ -341,13 +370,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "自检结果与轨迹",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.SelfTestResponse"
                         }
                     },
                     "400": {
-                        "description": "规则解析或热加失败",
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -357,7 +386,7 @@ const docTemplate = `{
         },
         "/rules/test": {
             "post": {
-                "description": "不落库地用一行样例数据测试一条草稿规则是否命中。",
+                "description": "对草稿规则文本针对一条样例 row 进行匹配测试，返回是否命中。",
                 "consumes": [
                     "application/json"
                 ],
@@ -365,14 +394,13 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Rules"
+                    "rules"
                 ],
-                "summary": "草稿规则试算",
-                "operationId": "rule_test",
+                "summary": "草稿规则测试",
                 "parameters": [
                     {
-                        "description": "草稿规则 + 样例行",
-                        "name": "body",
+                        "description": "草稿测试请求",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -382,13 +410,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "是否命中",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.RuleTestResponse"
                         }
                     },
                     "400": {
-                        "description": "JSON 非法或规则编译失败",
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -398,19 +426,17 @@ const docTemplate = `{
         },
         "/rules/{id}": {
             "delete": {
-                "description": "按 ID 删除规则并即时生效。",
+                "description": "按 ID 删除一条规则（实时生效）。",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Rules"
+                    "rules"
                 ],
-                "summary": "删除规则（热生效）",
-                "operationId": "rule_delete",
+                "summary": "删除规则",
                 "parameters": [
                     {
                         "type": "integer",
-                        "example": 1001,
                         "description": "规则 ID",
                         "name": "id",
                         "in": "path",
@@ -419,13 +445,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "删除成功，返回规则总数",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.DeleteResponse"
                         }
                     },
                     "400": {
-                        "description": "ID 非法",
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -435,18 +461,17 @@ const docTemplate = `{
         },
         "/versions": {
             "get": {
-                "description": "返回已发布的规则集版本快照列表。",
+                "description": "返回所有已发布的规则集快照。",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Versions"
+                    "versions"
                 ],
-                "summary": "版本快照列表",
-                "operationId": "version_list",
+                "summary": "版本列表",
                 "responses": {
                     "200": {
-                        "description": "版本列表",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.VersionListResponse"
                         }
@@ -454,7 +479,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "对当前规则集打一个版本快照，可附带备注 note。",
+                "description": "将当前规则集快照为一个新版本（备注可选）。",
                 "consumes": [
                     "application/json"
                 ],
@@ -462,14 +487,13 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Versions"
+                    "versions"
                 ],
-                "summary": "发布版本快照",
-                "operationId": "version_publish",
+                "summary": "发布版本",
                 "parameters": [
                     {
-                        "description": "可选备注",
-                        "name": "body",
+                        "description": "发布请求（可选备注）",
+                        "name": "request",
                         "in": "body",
                         "schema": {
                             "$ref": "#/definitions/router.PublishRequest"
@@ -478,7 +502,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "新版本号与规则数",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.PublishResponse"
                         }
@@ -488,20 +512,18 @@ const docTemplate = `{
         },
         "/versions/{v}/rollback": {
             "post": {
-                "description": "将规则集回滚到指定版本快照并即时生效。",
+                "description": "将规则集回滚到指定版本快照（实时生效）。",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Versions"
+                    "versions"
                 ],
-                "summary": "回滚到指定版本",
-                "operationId": "version_rollback",
+                "summary": "回滚版本",
                 "parameters": [
                     {
                         "type": "integer",
-                        "example": 1,
-                        "description": "目标版本号",
+                        "description": "版本号",
                         "name": "v",
                         "in": "path",
                         "required": true
@@ -509,19 +531,19 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "回滚成功",
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/router.RollbackResponse"
                         }
                     },
                     "400": {
-                        "description": "版本号非法",
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "版本不存在",
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/router.ErrorResponse"
                         }
@@ -580,14 +602,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "priority": {
-                    "description": "higher sorts first",
                     "type": "integer"
                 },
                 "rule": {
                     "type": "string"
                 },
                 "version": {
-                    "description": "monotonic per-rule revision (0 = unset)",
                     "type": "integer"
                 }
             }
@@ -618,24 +638,72 @@ const docTemplate = `{
                 }
             }
         },
+        "router.EvaluateAllRequest": {
+            "type": "object",
+            "properties": {
+                "row": {
+                    "$ref": "#/definitions/router.UserRow"
+                },
+                "uid": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "router.EvaluateAllResponse": {
+            "type": "object",
+            "properties": {
+                "failed": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/router.FailedRule"
+                    }
+                },
+                "failed_count": {
+                    "type": "integer",
+                    "example": 58
+                },
+                "failed_rule_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "passed": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "passed_count": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "passed_rule_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "total_rules": {
+                    "type": "integer",
+                    "example": 60
+                },
+                "uid": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
         "router.EvaluateRequest": {
             "type": "object",
             "properties": {
                 "row": {
-                    "description": "The wide-table user row to evaluate.",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/router.UserRow"
-                        }
-                    ]
+                    "$ref": "#/definitions/router.UserRow"
                 },
                 "rule": {
-                    "description": "SQL rule text. Optional: defaults to the built-in flagship rule when empty.",
                     "type": "string",
                     "example": "age BETWEEN 25 AND 40 AND province IN ('广东','江苏','浙江') AND active_score \u003e= 85"
                 },
                 "rule_id": {
-                    "description": "Optional: explain an already-loaded rule by its ID (used only when \"rule\" is empty).",
                     "type": "integer",
                     "example": 0
                 }
@@ -657,6 +725,29 @@ const docTemplate = `{
                 "rule": {
                     "type": "string",
                     "example": "age BETWEEN 25 AND 40 AND active_score \u003e= 85"
+                }
+            }
+        },
+        "router.FailedRule": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "全算子覆盖-精准圈选(旗舰)"
+                },
+                "reasons": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ast.Reason"
+                    }
+                },
+                "rule": {
+                    "type": "string",
+                    "example": "age BETWEEN 25 AND 40 AND ... AND marital_status \u003c\u003e '未知'"
+                },
+                "rule_id": {
+                    "type": "integer",
+                    "example": 1001
                 }
             }
         },
@@ -702,12 +793,12 @@ const docTemplate = `{
                 }
             }
         },
-        "router.Ping2Response": {
+        "router.PingResponse": {
             "type": "object",
             "properties": {
                 "ping": {
                     "type": "string",
-                    "example": "pong2"
+                    "example": "pong"
                 }
             }
         },
@@ -996,11 +1087,11 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "2.0",
-	Host:             "localhost:8080",
-	BasePath:         "/",
+	Host:             "localhost:18080",
+	BasePath:         "/tcg-rulex-engine",
 	Schemes:          []string{"http"},
 	Title:            "AIRuleX 规则引擎 API",
-	Description:      "AIRuleX 实时规则引擎 HTTP 接口：在线评分（/match、/match/batch、/evaluate）、规则热更新（/rules*）与版本管理（/versions*）。请求/响应示例取自 data/users.json 与 data/rules.json。",
+	Description:      "AIRuleX 实时规则引擎（分层架构，全功能）：在线评分（/match、/match/batch、/evaluate、/evaluate/all）、规则热更新（/rules*）、版本管理（/versions*）、运维控制台（/）。",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

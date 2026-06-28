@@ -41,7 +41,7 @@ func registerSwagger(app *fiber.App, port int) {
 	}
 
 	docs.SwaggerInfo.Host = net.JoinHostPort(host, strconv.Itoa(port))
-	docs.SwaggerInfo.BasePath = "/"
+	docs.SwaggerInfo.BasePath = BasePath
 	docs.SwaggerInfo.Title = "AIRuleX 规则引擎 API"
 	docs.SwaggerInfo.Description = "AIRuleX 实时规则引擎 HTTP 接口：在线评分（/match、/match/batch、/evaluate）、规则热更新（/rules*）与版本管理（/versions*）。"
 	docs.SwaggerInfo.Version = "2.0"

@@ -37,8 +37,8 @@ const (
 
 // token is a single lexical token.
 type token struct {
-	Kind tokenKind
 	Text string
+	Kind tokenKind
 	Pos  int
 }
 

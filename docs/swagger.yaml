@@ -1,4 +1,4 @@
-basePath: /
+basePath: /tcg-rulex-engine
 definitions:
   ast.Reason:
     properties:
@@ -33,12 +33,10 @@ definitions:
       name:
         type: string
       priority:
-        description: higher sorts first
         type: integer
       rule:
         type: string
       version:
-        description: monotonic per-rule revision (0 = unset)
         type: integer
     type: object
   router.DeleteResponse:
@@ -59,21 +57,53 @@ definitions:
         example: 'bad rule json: unexpected end of JSON input'
         type: string
     type: object
+  router.EvaluateAllRequest:
+    properties:
+      row:
+        $ref: '#/definitions/router.UserRow'
+      uid:
+        example: 1
+        type: integer
+    type: object
+  router.EvaluateAllResponse:
+    properties:
+      failed:
+        items:
+          $ref: '#/definitions/router.FailedRule'
+        type: array
+      failed_count:
+        example: 58
+        type: integer
+      failed_rule_ids:
+        items:
+          type: integer
+        type: array
+      passed:
+        example: false
+        type: boolean
+      passed_count:
+        example: 2
+        type: integer
+      passed_rule_ids:
+        items:
+          type: integer
+        type: array
+      total_rules:
+        example: 60
+        type: integer
+      uid:
+        example: 1
+        type: integer
+    type: object
   router.EvaluateRequest:
     properties:
       row:
-        allOf:
-        - $ref: '#/definitions/router.UserRow'
-        description: The wide-table user row to evaluate.
+        $ref: '#/definitions/router.UserRow'
       rule:
-        description: 'SQL rule text. Optional: defaults to the built-in flagship rule
-          when empty.'
         example: age BETWEEN 25 AND 40 AND province IN ('广东','江苏','浙江') AND active_score
           >= 85
         type: string
       rule_id:
-        description: 'Optional: explain an already-loaded rule by its ID (used only
-          when "rule" is empty).'
         example: 0
         type: integer
     type: object
@@ -89,6 +119,22 @@ definitions:
       rule:
         example: age BETWEEN 25 AND 40 AND active_score >= 85
         type: string
+    type: object
+  router.FailedRule:
+    properties:
+      name:
+        example: 全算子覆盖-精准圈选(旗舰)
+        type: string
+      reasons:
+        items:
+          $ref: '#/definitions/ast.Reason'
+        type: array
+      rule:
+        example: age BETWEEN 25 AND 40 AND ... AND marital_status <> '未知'
+        type: string
+      rule_id:
+        example: 1001
+        type: integer
     type: object
   router.HealthResponse:
     properties:
@@ -119,10 +165,10 @@ definitions:
         example: 1
         type: integer
     type: object
-  router.Ping2Response:
+  router.PingResponse:
     properties:
       ping:
-        example: pong2
+        example: pong
         type: string
     type: object
   router.PublishRequest:
@@ -322,42 +368,35 @@ definitions:
           $ref: '#/definitions/engine.Version'
         type: array
     type: object
-host: localhost:8080
+host: localhost:18080
 info:
   contact: {}
-  description: AIRuleX 实时规则引擎 HTTP 接口：在线评分（/match、/match/batch、/evaluate）、规则热更新（/rules*）与版本管理（/versions*）。请求/响应示例取自
-    data/users.json 与 data/rules.json。
+  description: AIRuleX 实时规则引擎（分层架构，全功能）：在线评分（/match、/match/batch、/evaluate、/evaluate/all）、规则热更新（/rules*）、版本管理（/versions*）、运维控制台（/）。
   title: AIRuleX 规则引擎 API
   version: "2.0"
 paths:
   /:
     get:
-      description: 返回运维控制台 Web 页面（HTML），用于在线增删改查 / 测试 / 发布规则。
-      operationId: editor
+      description: 返回单文件 HTML 规则编辑器（运维控制台）页面。
       produces:
       - text/html
       responses:
         "200":
-          description: HTML 页面
+          description: HTML page
           schema:
             type: string
-      summary: 规则编辑器控制台
+      summary: 运维控制台
       tags:
-      - Console
+      - console
   /evaluate:
     post:
       consumes:
       - application/json
-      description: |-
-        将一个宽表用户行在单条规则树上求值，返回是否通过 passed，以及导致未通过的谓词原因列表 reasons（passed=true 时为空）。
-        - rule：可选，SQL 规则文本；省略时使用内置 flagship 规则
-        - rule_id：可选，对已加载的规则按 ID 取其表达式进行解释（仅当 rule 为空时生效）
-        - row：宽表用户字段
-      operationId: evaluate
+      description: 对一条规则（rule 文本优先，其次 rule_id，否则内置旗舰规则）评估给定 row，返回是否通过及失败原因。
       parameters:
       - description: 评估请求
         in: body
-        name: body
+        name: request
         required: true
         schema:
           $ref: '#/definitions/router.EvaluateRequest'
@@ -365,42 +404,66 @@ paths:
       - application/json
       responses:
         "200":
-          description: 评估结果（passed + reasons）
+          description: OK
           schema:
             $ref: '#/definitions/router.EvaluateResponse'
         "400":
-          description: JSON 解析或规则解析失败
+          description: Bad Request
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "404":
-          description: rule_id 未加载
+          description: Not Found
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: 单规则评估并解释
+      summary: 单规则评估
       tags:
-      - Scoring
-  /healthz:
-    get:
-      description: 返回服务存活状态与当前已编译规则数。
-      operationId: health_check
+      - scoring
+  /evaluate/all:
+    post:
+      consumes:
+      - application/json
+      description: 将一条 row 对所有已加载规则评估（门控语义）：仅当满足全部规则时 passed 为 true，否则列出每条未满足的规则及原因。
+      parameters:
+      - description: 全规则评估请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/router.EvaluateAllRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: 服务正常
+          description: OK
+          schema:
+            $ref: '#/definitions/router.EvaluateAllResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: 全规则评估（门控）
+      tags:
+      - scoring
+  /healthz:
+    get:
+      description: 返回服务健康状态与当前已加载规则数。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
           schema:
             $ref: '#/definitions/router.HealthResponse'
       summary: 健康检查
       tags:
-      - System
+      - probes
   /match:
     post:
       consumes:
       - application/json
-      description: 传入一个宽表用户对象（任意列，见 data/users.json 样例），返回命中的规则 ID、规则名与耗时。并发受引擎信号量限制，超出将排队。
-      operationId: match_single
+      description: 对单个宽表用户记录进行评分，返回命中的规则 ID 与名称。
       parameters:
-      - description: 宽表用户对象（允许任意附加字段）
+      - description: 用户宽表记录（允许附加任意列）
         in: body
         name: user
         required: true
@@ -410,24 +473,23 @@ paths:
       - application/json
       responses:
         "200":
-          description: 命中结果
+          description: OK
           schema:
             $ref: '#/definitions/router.MatchResponse'
         "400":
-          description: 请求体 JSON 解析失败
+          description: Bad Request
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: 单用户实时评分
+      summary: 在线评分（单用户）
       tags:
-      - Scoring
+      - scoring
   /match/batch:
     post:
       consumes:
       - application/json
-      description: 传入用户对象数组（顶层 JSON 数组），按顺序返回每个用户的命中结果。整批受引擎并发上限约束。
-      operationId: match_batch
+      description: 对一组宽表用户记录批量评分，返回每个用户的命中结果数组。
       parameters:
-      - description: 用户对象数组
+      - description: 用户宽表记录数组
         in: body
         name: users
         required: true
@@ -439,65 +501,61 @@ paths:
       - application/json
       responses:
         "200":
-          description: 逐用户命中结果
+          description: OK
           schema:
             items:
               $ref: '#/definitions/router.MatchResponse'
             type: array
         "400":
-          description: 请求体 JSON 解析失败
+          description: Bad Request
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: 批量用户实时评分
+      summary: 在线评分（批量）
       tags:
-      - Scoring
+      - scoring
   /metrics:
     get:
-      description: 以 Prometheus 文本曝光格式输出引擎指标：规则数、版本数、在判用户数、并发上限，以及最近窗口的 /match 延迟分位（p50/p90/p99）。
-      operationId: metrics
+      description: 以 Prometheus 文本曝光格式返回引擎指标：规则数、版本数、在飞用户数、并发上限与最近 /match 延迟分位数。
       produces:
       - text/plain
       responses:
         "200":
-          description: Prometheus 文本格式指标
+          description: Prometheus exposition text
           schema:
             type: string
       summary: Prometheus 指标
       tags:
-      - System
-  /ping2:
+      - probes
+  /ping:
     get:
-      description: 轻量存活探针，固定返回 {"ping":"pong2"}。
-      operationId: ping
+      description: 轻量存活探针，返回 {"ping":"pong"}。
       produces:
       - application/json
       responses:
         "200":
-          description: pong2
+          description: OK
           schema:
-            $ref: '#/definitions/router.Ping2Response'
+            $ref: '#/definitions/router.PingResponse'
       summary: 存活探针
       tags:
-      - System
+      - probes
   /rules:
     get:
-      description: 返回当前引擎已加载并编译的规则总数。
-      operationId: rule_count
+      description: 返回当前已加载（生效）规则的数量。
       produces:
       - application/json
       responses:
         "200":
-          description: 规则总数
+          description: OK
           schema:
             $ref: '#/definitions/router.RuleCountResponse'
       summary: 规则数量
       tags:
-      - System
+      - scoring
     post:
       consumes:
       - application/json
-      description: 新增或按 ID 更新一条规则并即时生效（原子重建缓存）。表达式字段名为 "rule"（SQL 文本）。
-      operationId: rule_upsert
+      description: 新增或更新一条规则并立即生效（热更新）。
       parameters:
       - description: 规则对象
         in: body
@@ -509,23 +567,21 @@ paths:
       - application/json
       responses:
         "200":
-          description: 写入成功，返回规则总数
+          description: OK
           schema:
             $ref: '#/definitions/router.UpsertResponse'
         "400":
-          description: 规则 JSON 非法或编译失败
+          description: Bad Request
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: 新增 / 更新规则（热生效）
+      summary: 新增/更新规则
       tags:
-      - Rules
+      - rules
   /rules/{id}:
     delete:
-      description: 按 ID 删除规则并即时生效。
-      operationId: rule_delete
+      description: 按 ID 删除一条规则（实时生效）。
       parameters:
       - description: 规则 ID
-        example: 1001
         in: path
         name: id
         required: true
@@ -534,67 +590,63 @@ paths:
       - application/json
       responses:
         "200":
-          description: 删除成功，返回规则总数
+          description: OK
           schema:
             $ref: '#/definitions/router.DeleteResponse'
         "400":
-          description: ID 非法
+          description: Bad Request
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: 删除规则（热生效）
+      summary: 删除规则
       tags:
-      - Rules
+      - rules
   /rules/list:
     get:
-      description: 返回当前可编辑的全部规则。
-      operationId: rule_list
+      description: 返回全部可编辑规则。
       produces:
       - application/json
       responses:
         "200":
-          description: 规则列表
+          description: OK
           schema:
             $ref: '#/definitions/router.RuleListResponse'
       summary: 规则列表
       tags:
-      - Rules
+      - rules
   /rules/selftest:
     post:
       consumes:
       - application/json
-      description: 对运行中的引擎证明复杂规则的热增 / 热删：评分 → 热加规则（应命中）→ 热删规则（应消失），返回逐步轨迹与两个布尔证明。rule
-        与 row 均可省略（使用内置 flagship 规则与样例）。
-      operationId: rule_selftest
+      description: 验证一条复杂规则的实时新增与删除。请求体可选（{rule,row}），缺省时使用内置旗舰规则与样例用户。
       parameters:
-      - description: 可选：自定义规则与样例行
+      - description: 自检请求（可选）
         in: body
-        name: body
+        name: request
         schema:
           $ref: '#/definitions/router.SelfTestRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: 自检结果与轨迹
+          description: OK
           schema:
             $ref: '#/definitions/router.SelfTestResponse'
         "400":
-          description: 规则解析或热加失败
+          description: Bad Request
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: 规则热增删自检
+      summary: 自检（热增删验证）
       tags:
-      - Rules
+      - rules
   /rules/test:
     post:
       consumes:
       - application/json
-      description: 不落库地用一行样例数据测试一条草稿规则是否命中。
-      operationId: rule_test
+      description: 对草稿规则文本针对一条样例 row 进行匹配测试，返回是否命中。
       parameters:
-      - description: 草稿规则 + 样例行
+      - description: 草稿测试请求
         in: body
-        name: body
+        name: request
         required: true
         schema:
           $ref: '#/definitions/router.RuleTestRequest'
@@ -602,58 +654,54 @@ paths:
       - application/json
       responses:
         "200":
-          description: 是否命中
+          description: OK
           schema:
             $ref: '#/definitions/router.RuleTestResponse'
         "400":
-          description: JSON 非法或规则编译失败
+          description: Bad Request
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: 草稿规则试算
+      summary: 草稿规则测试
       tags:
-      - Rules
+      - rules
   /versions:
     get:
-      description: 返回已发布的规则集版本快照列表。
-      operationId: version_list
+      description: 返回所有已发布的规则集快照。
       produces:
       - application/json
       responses:
         "200":
-          description: 版本列表
+          description: OK
           schema:
             $ref: '#/definitions/router.VersionListResponse'
-      summary: 版本快照列表
+      summary: 版本列表
       tags:
-      - Versions
+      - versions
     post:
       consumes:
       - application/json
-      description: 对当前规则集打一个版本快照，可附带备注 note。
-      operationId: version_publish
+      description: 将当前规则集快照为一个新版本（备注可选）。
       parameters:
-      - description: 可选备注
+      - description: 发布请求（可选备注）
         in: body
-        name: body
+        name: request
         schema:
           $ref: '#/definitions/router.PublishRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: 新版本号与规则数
+          description: OK
           schema:
             $ref: '#/definitions/router.PublishResponse'
-      summary: 发布版本快照
+      summary: 发布版本
       tags:
-      - Versions
+      - versions
   /versions/{v}/rollback:
     post:
-      description: 将规则集回滚到指定版本快照并即时生效。
-      operationId: version_rollback
+      description: 将规则集回滚到指定版本快照（实时生效）。
       parameters:
-      - description: 目标版本号
-        example: 1
+      - description: 版本号
         in: path
         name: v
         required: true
@@ -662,20 +710,20 @@ paths:
       - application/json
       responses:
         "200":
-          description: 回滚成功
+          description: OK
           schema:
             $ref: '#/definitions/router.RollbackResponse'
         "400":
-          description: 版本号非法
+          description: Bad Request
           schema:
             $ref: '#/definitions/router.ErrorResponse'
         "404":
-          description: 版本不存在
+          description: Not Found
           schema:
             $ref: '#/definitions/router.ErrorResponse'
-      summary: 回滚到指定版本
+      summary: 回滚版本
       tags:
-      - Versions
+      - versions
 schemes:
 - http
 swagger: "2.0"

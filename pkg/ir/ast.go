@@ -6,9 +6,9 @@ type Node interface{ node() }
 // Value is a literal operand: either a string or a numeric literal (kept as raw
 // text so the original formatting is preserved on emit).
 type Value struct {
+	Str      string
+	Num      string
 	IsString bool
-	Str      string // when IsString
-	Num      string // when !IsString (raw number text)
 }
 
 // Logic is an AND/OR of two or more operands.

@@ -15,9 +15,9 @@ const (
 // Value is a tagged union held on the VM stack. Using a flat struct (no
 // interfaces) keeps evaluation allocation-free and avoids reflection.
 type Value struct {
-	k vkind
-	n float64
 	s string
+	n float64
+	k vkind
 	b bool
 }
 

@@ -28,17 +28,17 @@ type Cond struct {
 
 // Row is one decision-table row: all conditions AND-ed together.
 type Row struct {
-	Name     string `json:"name"`
-	Priority int    `json:"priority"`
 	Enabled  *bool  `json:"enabled"`
+	Name     string `json:"name"`
 	When     []Cond `json:"when"`
+	Priority int    `json:"priority"`
 }
 
 // Table is a decision table.
 type Table struct {
 	Name   string `json:"name"`
-	IDBase int64  `json:"id_base"`
 	Rows   []Row  `json:"rows"`
+	IDBase int64  `json:"id_base"`
 }
 
 // Load reads a decision table from a JSON file.
