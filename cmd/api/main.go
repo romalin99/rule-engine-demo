@@ -17,6 +17,12 @@ package main
 
 import "tcg-rulex-engine/internal/cli"
 
+// @title			AIRuleX 规则引擎 API
+// @version		2.0
+// @description	AIRuleX 实时规则引擎 HTTP 接口：在线评分（/match、/match/batch、/evaluate）、规则热更新（/rules*）与版本管理（/versions*）。请求/响应示例取自 data/users.json 与 data/rules.json。
+// @host			localhost:8080
+// @BasePath		/
+// @schemes		http
 func main() {
 	cli.RunCLI()
 }

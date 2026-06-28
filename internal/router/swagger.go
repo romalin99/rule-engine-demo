@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 
 	swaggo "github.com/gofiber/contrib/v3/swaggo"
 	"github.com/gofiber/fiber/v3"
@@ -14,30 +15,41 @@ import (
 	"tcg-rulex-engine/pkg/logs"
 )
 
-// Init registers the Swagger UI routes on the given Fiber app.
-// It resolves the host IP (overridable via the SWAGGER_HOST environment variable),
-// populates the SwaggerInfo metadata, and mounts the UI at /swagger/*.
+// Init registers the Swagger UI using the full application config. Kept for
+// callers that boot the server with a *config.Config; the spec Host is built
+// from c.Port (the host part is overridable via the SWAGGER_HOST env var).
 func Init(app *fiber.App, c *config.Config) {
-	host := getLocalIP()
+	registerSwagger(app, c.Port)
+}
 
-	if envHost := os.Getenv("SWAGGER_HOST"); envHost != "" {
-		host = envHost
+// RegisterSwagger mounts the Swagger UI on app. port is used only to populate
+// the spec's Host field (the "Try it out" base URL) and is normally derived
+// from the listen address. The host part can be overridden with SWAGGER_HOST.
+func RegisterSwagger(app *fiber.App, port int) {
+	registerSwagger(app, port)
+}
+
+// registerSwagger resolves the host IP, populates the SwaggerInfo metadata for
+// the AIRuleX rule engine, and mounts the UI at /swagger/*.
+func registerSwagger(app *fiber.App, port int) {
+	host := os.Getenv("SWAGGER_HOST")
+	if host == "" {
+		host = getLocalIP()
 	}
-
 	if host == "" {
 		host = getOutboundIP()
 	}
 
-	docs.SwaggerInfo.Host = net.JoinHostPort(host, strconv.Itoa(c.Port))
-	docs.SwaggerInfo.BasePath = "/tcg-ucs-fe"
-	docs.SwaggerInfo.Title = "REST API Document For TCG-UCS-FE"
-	docs.SwaggerInfo.Description = "Created by BSD\n\nAPI for TCG-UCS-FE System"
+	docs.SwaggerInfo.Host = net.JoinHostPort(host, strconv.Itoa(port))
+	docs.SwaggerInfo.BasePath = "/"
+	docs.SwaggerInfo.Title = "AIRuleX 规则引擎 API"
+	docs.SwaggerInfo.Description = "AIRuleX 实时规则引擎 HTTP 接口：在线评分（/match、/match/batch、/evaluate）、规则热更新（/rules*）与版本管理（/versions*）。"
 	docs.SwaggerInfo.Version = "2.0"
 	docs.SwaggerInfo.Schemes = []string{"http"} // add "https" in production
 
 	// Mount the Swagger UI; the spec is served automatically from the docs package.
 	app.Get("/swagger/*", swaggo.New(swaggo.Config{
-		Title:                    "TCG-UCS-FE API Documentation",
+		Title:                    "AIRuleX 规则引擎 API 文档",
 		DeepLinking:              true,   // enable deep-linking to individual operations
 		DocExpansion:             "list", // "list" | "full" | "none"
 		DefaultModelsExpandDepth: -1,     // -1 = collapse models, 1 = expand one level
@@ -45,13 +57,26 @@ func Init(app *fiber.App, c *config.Config) {
 		DisplayOperationId:       true,   // show operationId (useful for debugging)
 		DisplayRequestDuration:   true,   // show per-request latency (useful in development)
 		PersistAuthorization:     false,  // do not persist Authorization header (recommended for production)
-		ValidatorUrl:             "none", // Close the validator badge in the bottom right corner.
+		ValidatorUrl:             "none", // close the validator badge in the bottom-right corner
 		CustomStyle: `
 		.opblock-summary-operation-id {
 		   word-break: keep-all !important;
 		}
 		`,
 	}))
+}
+
+// portFromAddr extracts the TCP port from a listen address such as ":8080" or
+// "0.0.0.0:8080". It falls back to 8080 when the address has no parseable port.
+func portFromAddr(addr string) int {
+	_, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		portStr = strings.TrimPrefix(addr, ":")
+	}
+	if p, perr := strconv.Atoi(portStr); perr == nil {
+		return p
+	}
+	return 8080
 }
 
 // getOutboundIP returns the preferred outbound IP address of the host by

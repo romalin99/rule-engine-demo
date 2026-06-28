@@ -77,15 +77,45 @@ func (s *Server) App() *fiber.App {
 
 // --- Operations console handlers (step 11) ------------------------------------
 
+// handleEditor godoc
+//
+//	@ID				editor
+//	@Summary		规则编辑器控制台
+//	@Description	返回运维控制台 Web 页面（HTML），用于在线增删改查 / 测试 / 发布规则。
+//	@Tags			Console
+//	@Produce		html
+//	@Success		200	{string}	string	"HTML 页面"
+//	@Router			/ [get]
 func (s *Server) handleEditor(c fiber.Ctx) error {
 	c.Set("Content-Type", "text/html; charset=utf-8")
 	return c.SendString(web.Page)
 }
 
+// handleRuleList godoc
+//
+//	@ID				rule_list
+//	@Summary		规则列表
+//	@Description	返回当前可编辑的全部规则。
+//	@Tags			Rules
+//	@Produce		json
+//	@Success		200	{object}	RuleListResponse	"规则列表"
+//	@Router			/rules/list [get]
 func (s *Server) handleRuleList(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"rules": s.mgr.List()})
 }
 
+// handleRuleUpsert godoc
+//
+//	@ID				rule_upsert
+//	@Summary		新增 / 更新规则（热生效）
+//	@Description	新增或按 ID 更新一条规则并即时生效（原子重建缓存）。表达式字段名为 "rule"（SQL 文本）。
+//	@Tags			Rules
+//	@Accept			json
+//	@Produce		json
+//	@Param			rule	body		RuleInput		true	"规则对象"
+//	@Success		200		{object}	UpsertResponse	"写入成功，返回规则总数"
+//	@Failure		400		{object}	ErrorResponse	"规则 JSON 非法或编译失败"
+//	@Router			/rules [post]
 func (s *Server) handleRuleUpsert(c fiber.Ctx) error {
 	var r model.Rule
 	if err := c.Bind().Body(&r); err != nil {
@@ -97,6 +127,17 @@ func (s *Server) handleRuleUpsert(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ok": true, "id": r.ID, "rules": s.eng.RuleCount()})
 }
 
+// handleRuleDelete godoc
+//
+//	@ID				rule_delete
+//	@Summary		删除规则（热生效）
+//	@Description	按 ID 删除规则并即时生效。
+//	@Tags			Rules
+//	@Produce		json
+//	@Param			id	path		int				true	"规则 ID"	example(1001)
+//	@Success		200	{object}	DeleteResponse	"删除成功，返回规则总数"
+//	@Failure		400	{object}	ErrorResponse	"ID 非法"
+//	@Router			/rules/{id} [delete]
 func (s *Server) handleRuleDelete(c fiber.Ctx) error {
 	id, err := strconv.ParseInt(c.Params("id"), 10, 64)
 	if err != nil {
@@ -106,6 +147,18 @@ func (s *Server) handleRuleDelete(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ok": true, "id": id, "rules": s.eng.RuleCount()})
 }
 
+// handleRuleTest godoc
+//
+//	@ID				rule_test
+//	@Summary		草稿规则试算
+//	@Description	不落库地用一行样例数据测试一条草稿规则是否命中。
+//	@Tags			Rules
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		RuleTestRequest		true	"草稿规则 + 样例行"
+//	@Success		200		{object}	RuleTestResponse	"是否命中"
+//	@Failure		400		{object}	ErrorResponse		"JSON 非法或规则编译失败"
+//	@Router			/rules/test [post]
 func (s *Server) handleRuleTest(c fiber.Ctx) error {
 	var req struct {
 		Rule string         `json:"rule"`
@@ -121,10 +174,30 @@ func (s *Server) handleRuleTest(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"matched": matched})
 }
 
+// handleVersionList godoc
+//
+//	@ID				version_list
+//	@Summary		版本快照列表
+//	@Description	返回已发布的规则集版本快照列表。
+//	@Tags			Versions
+//	@Produce		json
+//	@Success		200	{object}	VersionListResponse	"版本列表"
+//	@Router			/versions [get]
 func (s *Server) handleVersionList(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"versions": s.mgr.Versions()})
 }
 
+// handlePublish godoc
+//
+//	@ID				version_publish
+//	@Summary		发布版本快照
+//	@Description	对当前规则集打一个版本快照，可附带备注 note。
+//	@Tags			Versions
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		PublishRequest	false	"可选备注"
+//	@Success		200		{object}	PublishResponse	"新版本号与规则数"
+//	@Router			/versions [post]
 func (s *Server) handlePublish(c fiber.Ctx) error {
 	var req struct {
 		Note string `json:"note"`
@@ -134,6 +207,18 @@ func (s *Server) handlePublish(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"version": v.Version, "count": v.Count})
 }
 
+// handleRollback godoc
+//
+//	@ID				version_rollback
+//	@Summary		回滚到指定版本
+//	@Description	将规则集回滚到指定版本快照并即时生效。
+//	@Tags			Versions
+//	@Produce		json
+//	@Param			v	path		int					true	"目标版本号"	example(1)
+//	@Success		200	{object}	RollbackResponse	"回滚成功"
+//	@Failure		400	{object}	ErrorResponse		"版本号非法"
+//	@Failure		404	{object}	ErrorResponse		"版本不存在"
+//	@Router			/versions/{v}/rollback [post]
 func (s *Server) handleRollback(c fiber.Ctx) error {
 	v, err := strconv.Atoi(c.Params("v"))
 	if err != nil {
@@ -145,19 +230,57 @@ func (s *Server) handleRollback(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ok": true, "version": v, "rules": s.eng.RuleCount()})
 }
 
+// handleHealth godoc
+//
+//	@ID				health_check
+//	@Summary		健康检查
+//	@Description	返回服务存活状态与当前已编译规则数。
+//	@Tags			System
+//	@Produce		json
+//	@Success		200	{object}	HealthResponse	"服务正常"
+//	@Router			/healthz [get]
 func (s *Server) handleHealth(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ok": true, "rules": s.eng.RuleCount()})
 }
 
+// handlePing2 godoc
+//
+//	@ID				ping
+//	@Summary		存活探针
+//	@Description	轻量存活探针，固定返回 {"ping":"pong2"}。
+//	@Tags			System
+//	@Produce		json
+//	@Success		200	{object}	Ping2Response	"pong2"
+//	@Router			/ping2 [get]
+//
 // handlePing2 is a lightweight liveness probe.
 func (s *Server) handlePing2(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ping": "pong2"})
 }
 
+// handleRules godoc
+//
+//	@ID				rule_count
+//	@Summary		规则数量
+//	@Description	返回当前引擎已加载并编译的规则总数。
+//	@Tags			System
+//	@Produce		json
+//	@Success		200	{object}	RuleCountResponse	"规则总数"
+//	@Router			/rules [get]
 func (s *Server) handleRules(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"rules": s.eng.RuleCount()})
 }
 
+// handleMetrics godoc
+//
+//	@ID				metrics
+//	@Summary		Prometheus 指标
+//	@Description	以 Prometheus 文本曝光格式输出引擎指标：规则数、版本数、在判用户数、并发上限，以及最近窗口的 /match 延迟分位（p50/p90/p99）。
+//	@Tags			System
+//	@Produce		plain
+//	@Success		200	{string}	string	"Prometheus 文本格式指标"
+//	@Router			/metrics [get]
+//
 // handleMetrics exposes engine metrics in Prometheus text exposition format
 // (dependency-free) so a Prometheus server can scrape /metrics directly.
 func (s *Server) handleMetrics(c fiber.Ctx) error {
@@ -185,6 +308,18 @@ func (s *Server) handleMetrics(c fiber.Ctx) error {
 	return c.SendString(b.String())
 }
 
+// handleMatch godoc
+//
+//	@ID				match_single
+//	@Summary		单用户实时评分
+//	@Description	传入一个宽表用户对象（任意列，见 data/users.json 样例），返回命中的规则 ID、规则名与耗时。并发受引擎信号量限制，超出将排队。
+//	@Tags			Scoring
+//	@Accept			json
+//	@Produce		json
+//	@Param			user	body		UserRow			true	"宽表用户对象（允许任意附加字段）"
+//	@Success		200		{object}	MatchResponse	"命中结果"
+//	@Failure		400		{object}	ErrorResponse	"请求体 JSON 解析失败"
+//	@Router			/match [post]
 func (s *Server) handleMatch(c fiber.Ctx) error {
 	var u model.User
 	if err := c.Bind().Body(&u); err != nil {
@@ -200,6 +335,18 @@ func (s *Server) handleMatch(c fiber.Ctx) error {
 	return c.JSON(resp)
 }
 
+// handleBatch godoc
+//
+//	@ID				match_batch
+//	@Summary		批量用户实时评分
+//	@Description	传入用户对象数组（顶层 JSON 数组），按顺序返回每个用户的命中结果。整批受引擎并发上限约束。
+//	@Tags			Scoring
+//	@Accept			json
+//	@Produce		json
+//	@Param			users	body		[]UserRow		true	"用户对象数组"
+//	@Success		200		{array}		MatchResponse	"逐用户命中结果"
+//	@Failure		400		{object}	ErrorResponse	"请求体 JSON 解析失败"
+//	@Router			/match/batch [post]
 func (s *Server) handleBatch(c fiber.Ctx) error {
 	// The batch body is a top-level JSON array, so decode it directly (Fiber's
 	// struct binder targets objects); each element uses model.User.UnmarshalJSON.
@@ -251,6 +398,8 @@ func (s *Server) scoreOne(u model.User) matchResponse {
 // Serve loads rules into a new engine and serves HTTP (Fiber v3) until interrupted.
 func Serve(addr string, eng *engine.Engine) error {
 	srv := NewServer(eng)
+	app := srv.App()
+	RegisterSwagger(app, portFromAddr(addr)) // mount Swagger UI at /swagger/*
 	fmt.Printf("rule-engine serving on %s (rules=%d)\n", addr, eng.RuleCount())
 	fmt.Println("  GET  /              web rule editor (operations console)")
 	fmt.Println("  POST /match        single user  -> matched rules")
@@ -261,5 +410,6 @@ func Serve(addr string, eng *engine.Engine) error {
 	fmt.Println("  POST /rules/selftest  live add a complex rule -> match -> delete (proof)")
 	fmt.Println("  POST /versions     publish snapshot   POST /versions/:v/rollback")
 	fmt.Println("  GET  /ping2        liveness probe -> {\"ping\":\"pong2\"}")
-	return srv.App().Listen(addr)
+	fmt.Println("  GET  /swagger/*    Swagger UI (OpenAPI docs)")
+	return app.Listen(addr)
 }

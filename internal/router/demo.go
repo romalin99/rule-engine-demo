@@ -43,14 +43,22 @@ func flagshipSampleRow() map[string]any {
 	}
 }
 
-// handleEvaluate accepts a wide-table user row, runs it through one rule tree,
-// and returns whether it passes plus the predicates that caused any failure.
+// handleEvaluate godoc
 //
-//	POST /evaluate
-//	{ "row": { ...wide-table fields... },
-//	  "rule": "<SQL, optional — defaults to the flagship rule>",
-//	  "rule_id": <int, optional — explain a currently-loaded rule by id> }
-//	-> { "passed": bool, "reasons": [{"expr","detail"}...], "rule": "..." }
+//	@ID				evaluate
+//	@Summary		单规则评估并解释
+//	@Description	将一个宽表用户行在单条规则树上求值，返回是否通过 passed，以及导致未通过的谓词原因列表 reasons（passed=true 时为空）。
+//	@Description	- rule：可选，SQL 规则文本；省略时使用内置 flagship 规则
+//	@Description	- rule_id：可选，对已加载的规则按 ID 取其表达式进行解释（仅当 rule 为空时生效）
+//	@Description	- row：宽表用户字段
+//	@Tags			Scoring
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		EvaluateRequest		true	"评估请求"
+//	@Success		200		{object}	EvaluateResponse	"评估结果（passed + reasons）"
+//	@Failure		400		{object}	ErrorResponse		"JSON 解析或规则解析失败"
+//	@Failure		404		{object}	ErrorResponse		"rule_id 未加载"
+//	@Router			/evaluate [post]
 func (s *Server) handleEvaluate(c fiber.Ctx) error {
 	var req struct {
 		Rule   string         `json:"rule"`
@@ -89,14 +97,18 @@ func (s *Server) handleEvaluate(c fiber.Ctx) error {
 	})
 }
 
-// handleSelfTest proves live (hot) add + delete of a complex rule on the running
-// engine: it scores a sample user before adding, after adding the rule (the user
-// should now match it), and after removing it (the match should disappear) —
-// returning a step-by-step trace and two boolean proofs.
+// handleSelfTest godoc
 //
-//	POST /rules/selftest
-//	{ "rule": "<SQL, optional>", "row": { ... , optional } }
-//	-> { "live_add_ok": bool, "live_remove_ok": bool, "steps": [...], ... }
+//	@ID				rule_selftest
+//	@Summary		规则热增删自检
+//	@Description	对运行中的引擎证明复杂规则的热增 / 热删：评分 → 热加规则（应命中）→ 热删规则（应消失），返回逐步轨迹与两个布尔证明。rule 与 row 均可省略（使用内置 flagship 规则与样例）。
+//	@Tags			Rules
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		SelfTestRequest		false	"可选：自定义规则与样例行"
+//	@Success		200		{object}	SelfTestResponse	"自检结果与轨迹"
+//	@Failure		400		{object}	ErrorResponse		"规则解析或热加失败"
+//	@Router			/rules/selftest [post]
 func (s *Server) handleSelfTest(c fiber.Ctx) error {
 	var req struct {
 		Rule string         `json:"rule"`
