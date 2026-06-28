@@ -1,0 +1,169 @@
+# .golangci.yaml
+version: "2"
+
+run:
+  timeout: 5m
+  concurrency: 16
+  allow-parallel-runners: true
+  # new-from-rev: origin/main   # 增量检查：仅检查相对 main 的变更
+
+linters:
+  default: none
+  enable:
+    # 正确性
+    - govet # go vet 官方检查
+    - staticcheck # 最全面的静态分析
+    - nilerr # nil error 误用
+    - predeclared # 误用内置标识符（len/cap/error 等）
+
+    # 安全
+    - gosec # 安全漏洞扫描
+
+    # 错误处理
+    - ineffassign # 无效赋值
+    - unused # 未使用的代码
+    - errcheck # 已注释；按需开启（噪音较多）
+
+    # 复杂度
+    - cyclop # 圈复杂度
+    - gocognit # 认知复杂度
+    - maintidx # 可维护性指数
+
+    # 代码风格
+    - revive # 替代 golint，规则可配置
+    - varnamelen # 变量名长度
+    - misspell # 单词拼写
+    - unconvert # 多余类型转换
+    - unparam # 无用参数
+
+  settings:
+    cyclop:
+      max-complexity: 125
+
+    gocognit:
+      min-complexity: 60
+
+    maintidx:
+      under: 20
+
+    varnamelen:
+      min-name-length: 1
+      ignore-names:
+        - id
+        - ip
+        - db
+        - ok
+        - i
+        - j
+        - k
+        - wg
+        - mu
+        - c
+        - v
+        - r
+        - w
+      ignore-type-assert-ok: true
+      ignore-map-index-ok: true
+      ignore-chan-recv-ok: true
+
+    gosec:
+      excludes:
+        - G401
+        - G501
+        - G101
+        - G117
+        - G301
+        - G115
+        - G704
+        # 本项目噪声/不适用项：os.ReadFile 路径为服务端配置非外部输入(G304)；
+        # 确定性基准/样本随机含 math/rand/v2(G404)；定长求值栈已有显式 sp 边界检查(G602)
+        - G304
+        - G404
+        - G602
+
+    staticcheck:
+      checks:
+        - all
+        # ── Style: 跟项目命名约定冲突,关闭 ──
+        - -ST1000 # at least one file in a package should have a package comment
+        - -ST1003 # naming convention(下划线 / 大写缩写)
+        # ── Quick-Fix: 跟"显式聚合边界"约定冲突,关闭 ──
+        - -QF1008 # Omit embedded fields from selector expression
+
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+        - name: var-naming
+          disabled: true
+        - name: blank-imports
+          disabled: true
+
+# ─────────────────────────────────────────────
+# 格式化工具
+# ─────────────────────────────────────────────
+formatters:
+  enable:
+    - gci
+
+  settings:
+    gci: # ← 从 linters.settings 移到这里统一管理
+      sections:
+        - standard
+        - default
+        - prefix(tcg-rulex-engine)
+      custom-order: true # 强制按 sections 顺序排列
+      no-inline-comments: false
+      no-prefix-comments: false
+
+# ─────────────────────────────────────────────
+# 问题过滤 & 排除
+# ─────────────────────────────────────────────
+issues:
+  exclusions:
+    presets:
+      - common-false-positives
+
+    rules:
+      - path: _test\.go
+        linters:
+          - dupl
+          - funlen
+          - gocognit
+          - cyclop
+          - varnamelen
+          - maintidx
+          - errcheck
+
+      - path: \.pb\.go$
+        linters:
+          - all
+
+      - path: mock_.*\.go$
+        linters:
+          - unused
+          - revive
+          - varnamelen
+
+      - text: "should have (a package )?comment"
+        linters:
+          - revive
+
+      - text: "Potential hardcoded credentials"
+        linters:
+          - gosec
+        path: pkg/config/config\.go$
+
+  max-same-issues: 5
+  max-issues-per-linter: 50
+
+# ─────────────────────────────────────────────
+# 输出格式
+# ─────────────────────────────────────────────
+output:
+  formats:
+    text:
+      path: stdout
+      colors: true
+      print-issued-lines: true
+      print-linter-name: true

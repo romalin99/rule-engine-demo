@@ -35,8 +35,8 @@ Rule text ──Frontend.Parse──▶ ir.Node ──vm.Compile──▶ ByteCo
 
 ## Adding a VM opcode
 
-Add the constant in `vm/opcode.go`, emit it in `vm/compile.go`, and handle it in
-the `vm/vm.go` interpreter loop. Keep the interpreter allocation-free.
+Add the constant in `pkg/vm/opcode.go`, emit it in `pkg/vm/compile.go`, and handle it in
+the `pkg/vm/vm.go` interpreter loop. Keep the interpreter allocation-free.
 
 ## Guidelines
 

@@ -4,28 +4,69 @@
   "rows": [
     {
       "name": "广东高活跃数码",
+      "comment": "广东高活跃数码；决策表行(→编译为 SQL 规则)；条件算子: BETWEEN、IN、LIKE、比较。",
       "priority": 10,
       "when": [
-        { "field": "age", "op": "between", "values": [25, 40] },
-        { "field": "province", "op": "in", "values": ["广东", "江苏", "浙江"] },
-        { "field": "favorite_category", "op": "like", "value": "数%" },
-        { "field": "active_score", "op": ">=", "value": 85 }
+        {
+          "field": "age",
+          "op": "between",
+          "values": [
+            25,
+            40
+          ]
+        },
+        {
+          "field": "province",
+          "op": "in",
+          "values": [
+            "广东",
+            "江苏",
+            "浙江"
+          ]
+        },
+        {
+          "field": "favorite_category",
+          "op": "like",
+          "value": "数%"
+        },
+        {
+          "field": "active_score",
+          "op": ">=",
+          "value": 85
+        }
       ]
     },
     {
       "name": "女性会员复购",
+      "comment": "女性会员复购；决策表行(→编译为 SQL 规则)；条件算子: 等于、比较。",
       "priority": 6,
       "when": [
-        { "field": "gender", "op": "=", "value": "女" },
-        { "field": "vip_level", "op": ">=", "value": 2 },
-        { "field": "total_amount", "op": ">", "value": 5000 }
+        {
+          "field": "gender",
+          "op": "=",
+          "value": "女"
+        },
+        {
+          "field": "vip_level",
+          "op": ">=",
+          "value": 2
+        },
+        {
+          "field": "total_amount",
+          "op": ">",
+          "value": 5000
+        }
       ]
     },
     {
       "name": "缺手机号补全",
+      "comment": "缺手机号补全；决策表行(→编译为 SQL 规则)；条件算子: IS NULL。",
       "priority": 3,
       "when": [
-        { "field": "phone", "op": "isnull" }
+        {
+          "field": "phone",
+          "op": "isnull"
+        }
       ]
     }
   ]

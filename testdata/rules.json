@@ -1,0 +1,45 @@
+[
+  {
+    "id": 1,
+    "name": "电商精准营销-广东高价值男性",
+    "priority": 10,
+    "enabled": true,
+    "expr": "gender = '男' AND age BETWEEN 25 AND 35 AND province = '广东' AND vip_level >= 3 AND total_amount >= 10000"
+  },
+  {
+    "id": 2,
+    "name": "活跃iPhone低风险用户",
+    "priority": 8,
+    "enabled": true,
+    "expr": "login_days_30d >= 20 AND active_score >= 80 AND order_count >= 10 AND risk_level = '低' AND device_type = 'iPhone'"
+  },
+  {
+    "id": 3,
+    "name": "风控-高消费低信用低活跃",
+    "priority": 20,
+    "enabled": true,
+    "expr": "credit_score < 600 AND total_amount > 50000 AND login_days_30d < 5 AND province IN ('广东','浙江') AND age > 45"
+  },
+  {
+    "id": 4,
+    "name": "数码高活跃中高收入(IN/BETWEEN/LIKE)",
+    "priority": 12,
+    "enabled": true,
+    "expr": "age BETWEEN 25 AND 40 AND province IN ('广东','江苏','浙江') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '数%' AND active_score >= 85"
+  },
+  {
+    "id": 5,
+    "name": "女性会员复购",
+    "priority": 6,
+    "enabled": true,
+    "expr": "gender = '女' AND age >= 30 AND vip_level >= 2 AND total_amount > 5000 AND login_days_30d >= 15"
+  },
+  {
+    "id": 6,
+    "name": "全算子覆盖-精准圈选 (BETWEEN/IN/NOT IN/LIKE/NOT LIKE/<>/NOT/OR)",
+    "priority": 15,
+    "enabled": true,
+    "comment": "Flagship full-coverage rule — requires the native SQL front-end (uses NOT IN / NOT LIKE / NOT(...)).",
+    "expr": "age BETWEEN 25 AND 40 AND province IN ('广东','江苏','浙江') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '数%' AND occupation NOT LIKE '%学生%' AND active_score >= 85 AND credit_score BETWEEN 700 AND 850 AND total_amount > 5000 AND avg_order_amount <= 1000 AND last_login_time IS NOT NULL AND (vip_level >= 3 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
+  }
+]

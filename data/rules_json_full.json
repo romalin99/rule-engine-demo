@@ -1,0 +1,22 @@
+{
+  "comment": "Flagship full-coverage rule in the JSON DSL (use engine.JSONFrontend). Equivalent to rule #6 in rules.json. Shows between / in / not_in / like / not_like / comparisons / <> / OR-group / isnotnull / NOT(group).",
+  "and": [
+    { "field": "age", "op": "between", "values": [25, 40] },
+    { "field": "province", "op": "in", "values": ["广东", "江苏", "浙江"] },
+    { "field": "income_level", "op": "not_in", "values": ["<5k", "5k-10k"] },
+    { "field": "favorite_category", "op": "like", "value": "数%" },
+    { "field": "occupation", "op": "not_like", "value": "%学生%" },
+    { "field": "active_score", "op": ">=", "value": 85 },
+    { "field": "credit_score", "op": "between", "values": [700, 850] },
+    { "field": "total_amount", "op": ">", "value": 5000 },
+    { "field": "avg_order_amount", "op": "<=", "value": 1000 },
+    { "field": "last_login_time", "op": "isnotnull" },
+    { "or": [
+      { "field": "vip_level", "op": ">=", "value": 3 },
+      { "field": "order_count", "op": ">=", "value": 30 }
+    ] },
+    { "not": { "field": "risk_level", "op": "=", "value": "高" } },
+    { "field": "register_days", "op": ">=", "value": 180 },
+    { "field": "marital_status", "op": "<>", "value": "未知" }
+  ]
+}
