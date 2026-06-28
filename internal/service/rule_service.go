@@ -7,6 +7,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"tcg-rulex-engine/internal/infra"
 	"tcg-rulex-engine/pkg/engine"
@@ -260,10 +261,5 @@ func (s *RuleService) SelfTest(rule string, row map[string]any) (SelfTestResult,
 }
 
 func contains(ids []int64, id int64) bool {
-	for _, x := range ids {
-		if x == id {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ids, id)
 }

@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"sort"
+	"slices"
 	"sync"
 	"time"
 )
@@ -51,12 +51,9 @@ func (r *latencyRecorder) Percentiles() (p50, p90, p99 float64, n int) {
 	if size == 0 {
 		return 0, 0, 0, 0
 	}
-	sort.Slice(s, func(i, j int) bool { return s[i] < s[j] })
+	slices.Sort(s)
 	q := func(p float64) float64 {
-		i := int(p*float64(size-1) + 0.5)
-		if i < 0 {
-			i = 0
-		}
+		i := max(int(p*float64(size-1)+0.5), 0)
 		if i >= size {
 			i = size - 1
 		}

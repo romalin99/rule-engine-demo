@@ -23,7 +23,7 @@ func (h *RuleHandler) Editor(c fiber.Ctx) error {
 	return c.SendString(web.Page)
 }
 
-// RuleList: GET /rules/list -> all editable rules.
+// RuleList handles GET /rules/list -> all editable rules.
 //
 //	@Summary		规则列表
 //	@Description	返回全部可编辑规则。
@@ -35,7 +35,7 @@ func (h *RuleHandler) RuleList(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"rules": h.svc.List()})
 }
 
-// RuleUpsert: POST /rules -> add/update a rule and take effect immediately.
+// RuleUpsert handles POST /rules -> add/update a rule and take effect immediately.
 //
 //	@Summary		新增/更新规则
 //	@Description	新增或更新一条规则并立即生效（热更新）。
@@ -57,7 +57,7 @@ func (h *RuleHandler) RuleUpsert(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ok": true, "id": r.ID, "rules": h.svc.RuleCount()})
 }
 
-// RuleDelete: DELETE /rules/:id -> remove a rule (live).
+// RuleDelete handles DELETE /rules/:id -> remove a rule (live).
 //
 //	@Summary		删除规则
 //	@Description	按 ID 删除一条规则（实时生效）。
@@ -76,7 +76,7 @@ func (h *RuleHandler) RuleDelete(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ok": true, "id": id, "rules": h.svc.RuleCount()})
 }
 
-// RuleTest: POST /rules/test -> test a draft rule against a sample row.
+// RuleTest handles POST /rules/test -> test a draft rule against a sample row.
 //
 //	@Summary		草稿规则测试
 //	@Description	对草稿规则文本针对一条样例 row 进行匹配测试，返回是否命中。
@@ -102,7 +102,7 @@ func (h *RuleHandler) RuleTest(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"matched": matched})
 }
 
-// SelfTest: POST /rules/selftest -> prove live add + remove of a complex rule.
+// SelfTest handles POST /rules/selftest -> prove live add + remove of a complex rule.
 // Body is optional ({rule,row}); defaults to the flagship rule + sample user.
 //
 //	@Summary		自检（热增删验证）
@@ -127,7 +127,7 @@ func (h *RuleHandler) SelfTest(c fiber.Ctx) error {
 	return c.JSON(res)
 }
 
-// VersionList: GET /versions -> published snapshots.
+// VersionList handles GET /versions -> published snapshots.
 //
 //	@Summary		版本列表
 //	@Description	返回所有已发布的规则集快照。
@@ -139,7 +139,7 @@ func (h *RuleHandler) VersionList(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"versions": h.svc.Versions()})
 }
 
-// Publish: POST /versions -> snapshot the current rule set (optional note).
+// Publish handles POST /versions -> snapshot the current rule set (optional note).
 //
 //	@Summary		发布版本
 //	@Description	将当前规则集快照为一个新版本（备注可选）。
@@ -158,7 +158,7 @@ func (h *RuleHandler) Publish(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"version": v.Version, "count": v.Count})
 }
 
-// Rollback: POST /versions/:v/rollback -> restore a snapshot (live).
+// Rollback handles POST /versions/:v/rollback -> restore a snapshot (live).
 //
 //	@Summary		回滚版本
 //	@Description	将规则集回滚到指定版本快照（实时生效）。

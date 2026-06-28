@@ -53,7 +53,7 @@ type matchResponse struct {
 //	@Router			/ping [get]
 func (h *RuleHandler) Ping(c fiber.Ctx) error { return c.JSON(fiber.Map{"ping": "pong"}) }
 
-// Health: GET /healthz -> {"ok":true,"rules":N}.
+// Health handles GET /healthz -> {"ok":true,"rules":N}.
 //
 //	@Summary		健康检查
 //	@Description	返回服务健康状态与当前已加载规则数。
@@ -65,7 +65,7 @@ func (h *RuleHandler) Health(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ok": true, "rules": h.svc.RuleCount()})
 }
 
-// RuleCount: GET /rules -> {"rules":N}.
+// RuleCount handles GET /rules -> {"rules":N}.
 //
 //	@Summary		规则数量
 //	@Description	返回当前已加载（生效）规则的数量。

@@ -17,10 +17,14 @@ func main() {
 
 	// 2. Load rules (as if fetched from a DB).
 	eng.LoadRules([]model.Rule{
-		{ID: 1001, Name: "VIP", Enabled: true, Priority: 10,
-			Expr: "age BETWEEN 25 AND 40 AND province IN ('广东','江苏') AND active_score >= 85"},
-		{ID: 1002, Name: "高活跃", Enabled: true, Priority: 5,
-			Expr: "active_score >= 95"},
+		{
+			ID: 1001, Name: "VIP", Enabled: true, Priority: 10,
+			Expr: "age BETWEEN 25 AND 40 AND province IN ('广东','江苏') AND active_score >= 85",
+		},
+		{
+			ID: 1002, Name: "高活跃", Enabled: true, Priority: 5,
+			Expr: "active_score >= 95",
+		},
 	})
 
 	// 3. Score a wide-table user (e.g. arriving from Kafka).

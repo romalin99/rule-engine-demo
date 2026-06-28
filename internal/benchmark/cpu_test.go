@@ -18,7 +18,6 @@ func BenchmarkWorkersScaling(b *testing.B) {
 	eng, users := buildEngine(b, 2000, 5000)
 
 	for _, w := range []int{1, 2, 4, 8, 16, 32, 64} {
-		w := w
 		b.Run(fmt.Sprintf("workers=%d", w), func(b *testing.B) {
 			b.ResetTimer()
 			var last float64
@@ -34,7 +33,6 @@ func BenchmarkWorkersScaling(b *testing.B) {
 // BenchmarkRuleCountScaling shows how single-user latency grows with rule count.
 func BenchmarkRuleCountScaling(b *testing.B) {
 	for _, n := range []int{100, 1000, 5000, 10000} {
-		n := n
 		b.Run(fmt.Sprintf("rules=%d", n), func(b *testing.B) {
 			eng, users := buildEngine(b, n, 256)
 			b.ReportAllocs()
