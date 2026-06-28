@@ -12,9 +12,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/redis/go-redis/v9"
 
-	"tcg-rulex-engine/internal/client/mcs"
-	"tcg-rulex-engine/internal/client/uss"
-	"tcg-rulex-engine/internal/client/wps"
 	"tcg-rulex-engine/internal/config"
 	"tcg-rulex-engine/internal/repository"
 	"tcg-rulex-engine/pkg/engine"
@@ -25,11 +22,11 @@ import (
 // kept to mirror tcg-rulex-engine; for the in-memory rule engine these are optional and
 // may be nil unless the corresponding config is provided (see WireOracle).
 type ComClient struct {
-	DBX    *sqlx.DB      // Oracle handle (nil unless WireOracle is called)
-	Rc     *redis.Client // Redis (nil unless redis.addr configured)
-	UssSrv *uss.Client
-	McsSrv *mcs.Client
-	WpsSrv *wps.Client
+	DBX *sqlx.DB      // Oracle handle (nil unless WireOracle is called)
+	Rc  *redis.Client // Redis (nil unless redis.addr configured)
+	// UssSrv *uss.Client
+	// McsSrv *mcs.Client
+	// WpsSrv *wps.Client
 }
 
 // ComModel holds all data-access repositories (data layer).
@@ -55,13 +52,13 @@ func NewComManager(cfg *config.Config) *ComManager {
 	eng := engine.NewWithBackend(engine.NewBytecodeBackend(engine.NativeFrontend{}))
 
 	cm := &ComManager{
-		Engine:   eng,
-		Manager:  engine.NewManager(eng),
-		ComModel: ComModel{RuleRepository: repository.NewFileRuleRepository(repository.DefaultRulesPath)},
+		Engine:    eng,
+		Manager:   engine.NewManager(eng),
+		ComModel:  ComModel{RuleRepository: repository.NewFileRuleRepository(repository.DefaultRulesPath)},
 		ComClient: ComClient{
-			UssSrv: cfg.UssSrv.Init(),
-			McsSrv: cfg.McsSrv.Init(),
-			WpsSrv: cfg.WpsSrv.Init(),
+			// UssSrv: cfg.UssSrv.Init(),
+			// McsSrv: cfg.McsSrv.Init(),
+			// WpsSrv: cfg.WpsSrv.Init(),
 		},
 	}
 
@@ -95,15 +92,15 @@ func (m *ComManager) WireOracle(cfg *config.Config) {
 func (m *ComManager) Close() {
 	if m.DBX != nil {
 		_ = m.DBX.Close()
-	}
-	if m.UssSrv != nil {
-		m.UssSrv.Close()
-	}
-	if m.McsSrv != nil {
-		m.McsSrv.Close()
-	}
-	if m.WpsSrv != nil {
-		m.WpsSrv.Close()
+		// }
+		// if m.UssSrv != nil {
+		// 	m.UssSrv.Close()
+		// }
+		// if m.McsSrv != nil {
+		// 	m.McsSrv.Close()
+		// }
+		// if m.WpsSrv != nil {
+		// 	m.WpsSrv.Close()
 	}
 	if m.Rc != nil {
 		_ = m.Rc.Close()

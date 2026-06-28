@@ -44,14 +44,35 @@ type matchResponse struct {
 }
 
 // Ping is a lightweight liveness probe: GET /ping -> {"ping":"pong"}.
+//
+//	@Summary		存活探针
+//	@Description	轻量存活探针，返回 {"ping":"pong"}。
+//	@Tags			probes
+//	@Produce		json
+//	@Success		200	{object}	router.PingResponse
+//	@Router			/ping [get]
 func (h *RuleHandler) Ping(c fiber.Ctx) error { return c.JSON(fiber.Map{"ping": "pong"}) }
 
 // Health: GET /healthz -> {"ok":true,"rules":N}.
+//
+//	@Summary		健康检查
+//	@Description	返回服务健康状态与当前已加载规则数。
+//	@Tags			probes
+//	@Produce		json
+//	@Success		200	{object}	router.HealthResponse
+//	@Router			/healthz [get]
 func (h *RuleHandler) Health(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ok": true, "rules": h.svc.RuleCount()})
 }
 
 // RuleCount: GET /rules -> {"rules":N}.
+//
+//	@Summary		规则数量
+//	@Description	返回当前已加载（生效）规则的数量。
+//	@Tags			scoring
+//	@Produce		json
+//	@Success		200	{object}	router.RuleCountResponse
+//	@Router			/rules [get]
 func (h *RuleHandler) RuleCount(c fiber.Ctx) error {
 	return c.JSON(fiber.Map{"rules": h.svc.RuleCount()})
 }
@@ -78,6 +99,13 @@ func (h *RuleHandler) scoreOne(u model.User) matchResponse {
 // Metrics exposes engine metrics in Prometheus text exposition format at /metrics
 // (dependency-free): rule count, version count, in-flight users, concurrency cap,
 // and recent /match latency percentiles.
+//
+//	@Summary		Prometheus 指标
+//	@Description	以 Prometheus 文本曝光格式返回引擎指标：规则数、版本数、在飞用户数、并发上限与最近 /match 延迟分位数。
+//	@Tags			probes
+//	@Produce		plain
+//	@Success		200	{string}	string	"Prometheus exposition text"
+//	@Router			/metrics [get]
 func (h *RuleHandler) Metrics(c fiber.Ctx) error {
 	var b strings.Builder
 	b.WriteString("# HELP rule_engine_rules Number of active compiled rules.\n# TYPE rule_engine_rules gauge\n")

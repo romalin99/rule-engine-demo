@@ -1,11 +1,729 @@
 basePath: /tcg-rulex-engine
+definitions:
+  ast.Reason:
+    properties:
+      detail:
+        description: human-readable cause, including the actual value
+        type: string
+      expr:
+        description: the failing predicate / group, in SQL form
+        type: string
+    type: object
+  engine.Version:
+    properties:
+      count:
+        type: integer
+      note:
+        type: string
+      rules:
+        items:
+          $ref: '#/definitions/model.Rule'
+        type: array
+      time:
+        type: string
+      version:
+        type: integer
+    type: object
+  model.Rule:
+    properties:
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+      priority:
+        type: integer
+      rule:
+        type: string
+      version:
+        type: integer
+    type: object
+  router.DeleteResponse:
+    properties:
+      id:
+        example: 1001
+        type: integer
+      ok:
+        example: true
+        type: boolean
+      rules:
+        example: 10
+        type: integer
+    type: object
+  router.ErrorResponse:
+    properties:
+      error:
+        example: 'bad rule json: unexpected end of JSON input'
+        type: string
+    type: object
+  router.EvaluateAllRequest:
+    properties:
+      row:
+        $ref: '#/definitions/router.UserRow'
+      uid:
+        example: 1
+        type: integer
+    type: object
+  router.EvaluateAllResponse:
+    properties:
+      failed:
+        items:
+          $ref: '#/definitions/router.FailedRule'
+        type: array
+      failed_count:
+        example: 58
+        type: integer
+      failed_rule_ids:
+        items:
+          type: integer
+        type: array
+      passed:
+        example: false
+        type: boolean
+      passed_count:
+        example: 2
+        type: integer
+      passed_rule_ids:
+        items:
+          type: integer
+        type: array
+      total_rules:
+        example: 60
+        type: integer
+      uid:
+        example: 1
+        type: integer
+    type: object
+  router.EvaluateRequest:
+    properties:
+      row:
+        $ref: '#/definitions/router.UserRow'
+      rule:
+        example: age BETWEEN 25 AND 40 AND province IN ('广东','江苏','浙江') AND active_score
+          >= 85
+        type: string
+      rule_id:
+        example: 0
+        type: integer
+    type: object
+  router.EvaluateResponse:
+    properties:
+      passed:
+        example: false
+        type: boolean
+      reasons:
+        items:
+          $ref: '#/definitions/ast.Reason'
+        type: array
+      rule:
+        example: age BETWEEN 25 AND 40 AND active_score >= 85
+        type: string
+    type: object
+  router.FailedRule:
+    properties:
+      name:
+        example: 全算子覆盖-精准圈选(旗舰)
+        type: string
+      reasons:
+        items:
+          $ref: '#/definitions/ast.Reason'
+        type: array
+      rule:
+        example: age BETWEEN 25 AND 40 AND ... AND marital_status <> '未知'
+        type: string
+      rule_id:
+        example: 1001
+        type: integer
+    type: object
+  router.HealthResponse:
+    properties:
+      ok:
+        example: true
+        type: boolean
+      rules:
+        example: 10
+        type: integer
+    type: object
+  router.MatchResponse:
+    properties:
+      hits:
+        example: 2
+        type: integer
+      rule_ids:
+        items:
+          type: integer
+        type: array
+      rule_names:
+        items:
+          type: string
+        type: array
+      took_ms:
+        example: 0.123
+        type: number
+      uid:
+        example: 1
+        type: integer
+    type: object
+  router.PingResponse:
+    properties:
+      ping:
+        example: pong
+        type: string
+    type: object
+  router.PublishRequest:
+    properties:
+      note:
+        example: 上线 618 大促规则集
+        type: string
+    type: object
+  router.PublishResponse:
+    properties:
+      count:
+        example: 10
+        type: integer
+      version:
+        example: 1
+        type: integer
+    type: object
+  router.RollbackResponse:
+    properties:
+      ok:
+        example: true
+        type: boolean
+      rules:
+        example: 10
+        type: integer
+      version:
+        example: 1
+        type: integer
+    type: object
+  router.RuleCountResponse:
+    properties:
+      rules:
+        example: 10
+        type: integer
+    type: object
+  router.RuleInput:
+    properties:
+      enabled:
+        example: true
+        type: boolean
+      id:
+        example: 1001
+        type: integer
+      name:
+        example: 电商精准营销-广东高价值男性
+        type: string
+      priority:
+        example: 10
+        type: integer
+      rule:
+        example: gender = '男' AND age BETWEEN 25 AND 35 AND province = '广东' AND vip_level
+          >= 3 AND total_amount >= 10000
+        type: string
+      version:
+        example: 0
+        type: integer
+    type: object
+  router.RuleListResponse:
+    properties:
+      rules:
+        items:
+          $ref: '#/definitions/model.Rule'
+        type: array
+    type: object
+  router.RuleTestRequest:
+    properties:
+      row:
+        $ref: '#/definitions/router.UserRow'
+      rule:
+        example: age >= 30 AND vip_level >= 2 AND total_amount > 5000
+        type: string
+    type: object
+  router.RuleTestResponse:
+    properties:
+      matched:
+        example: true
+        type: boolean
+    type: object
+  router.SelfTestRequest:
+    properties:
+      row:
+        $ref: '#/definitions/router.UserRow'
+      rule:
+        example: age BETWEEN 25 AND 40 AND vip_level >= 3 AND active_score >= 85
+        type: string
+    type: object
+  router.SelfTestResponse:
+    properties:
+      added_rule_id:
+        example: 990001
+        type: integer
+      live_add_ok:
+        example: true
+        type: boolean
+      live_remove_ok:
+        example: true
+        type: boolean
+      rule:
+        type: string
+      sample_user:
+        additionalProperties: {}
+        type: object
+      steps:
+        items:
+          $ref: '#/definitions/router.SelfTestStep'
+        type: array
+    type: object
+  router.SelfTestStep:
+    properties:
+      matched:
+        items:
+          type: integer
+        type: array
+      rules:
+        example: 11
+        type: integer
+      step:
+        example: after_add
+        type: string
+    type: object
+  router.UpsertResponse:
+    properties:
+      id:
+        example: 1001
+        type: integer
+      ok:
+        example: true
+        type: boolean
+      rules:
+        example: 11
+        type: integer
+    type: object
+  router.UserRow:
+    properties:
+      active_score:
+        example: 91.52
+        type: number
+      age:
+        example: 28
+        type: integer
+      avg_order_amount:
+        example: 269.91
+        type: number
+      city:
+        example: 深圳
+        type: string
+      credit_score:
+        example: 765
+        type: integer
+      device_type:
+        example: iPhone
+        type: string
+      favorite_category:
+        example: 数码
+        type: string
+      gender:
+        example: 男
+        type: string
+      income_level:
+        example: 20k-30k
+        type: string
+      login_days_30d:
+        example: 28
+        type: integer
+      occupation:
+        example: 程序员
+        type: string
+      order_count:
+        example: 132
+        type: integer
+      province:
+        example: 广东
+        type: string
+      register_days:
+        example: 620
+        type: integer
+      risk_level:
+        example: 低
+        type: string
+      total_amount:
+        example: 35628.56
+        type: number
+      uid:
+        example: 1
+        type: integer
+      username:
+        example: user001
+        type: string
+      vip_level:
+        example: 3
+        type: integer
+    type: object
+  router.VersionListResponse:
+    properties:
+      versions:
+        items:
+          $ref: '#/definitions/engine.Version'
+        type: array
+    type: object
 host: localhost:18080
 info:
   contact: {}
   description: AIRuleX 实时规则引擎（分层架构，全功能）：在线评分（/match、/match/batch、/evaluate、/evaluate/all）、规则热更新（/rules*）、版本管理（/versions*）、运维控制台（/）。
   title: AIRuleX 规则引擎 API
   version: "2.0"
-paths: {}
+paths:
+  /:
+    get:
+      description: 返回单文件 HTML 规则编辑器（运维控制台）页面。
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: HTML page
+          schema:
+            type: string
+      summary: 运维控制台
+      tags:
+      - console
+  /evaluate:
+    post:
+      consumes:
+      - application/json
+      description: 对一条规则（rule 文本优先，其次 rule_id，否则内置旗舰规则）评估给定 row，返回是否通过及失败原因。
+      parameters:
+      - description: 评估请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/router.EvaluateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.EvaluateResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: 单规则评估
+      tags:
+      - scoring
+  /evaluate/all:
+    post:
+      consumes:
+      - application/json
+      description: 将一条 row 对所有已加载规则评估（门控语义）：仅当满足全部规则时 passed 为 true，否则列出每条未满足的规则及原因。
+      parameters:
+      - description: 全规则评估请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/router.EvaluateAllRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.EvaluateAllResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: 全规则评估（门控）
+      tags:
+      - scoring
+  /healthz:
+    get:
+      description: 返回服务健康状态与当前已加载规则数。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.HealthResponse'
+      summary: 健康检查
+      tags:
+      - probes
+  /match:
+    post:
+      consumes:
+      - application/json
+      description: 对单个宽表用户记录进行评分，返回命中的规则 ID 与名称。
+      parameters:
+      - description: 用户宽表记录（允许附加任意列）
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/router.UserRow'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.MatchResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: 在线评分（单用户）
+      tags:
+      - scoring
+  /match/batch:
+    post:
+      consumes:
+      - application/json
+      description: 对一组宽表用户记录批量评分，返回每个用户的命中结果数组。
+      parameters:
+      - description: 用户宽表记录数组
+        in: body
+        name: users
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/router.UserRow'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/router.MatchResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: 在线评分（批量）
+      tags:
+      - scoring
+  /metrics:
+    get:
+      description: 以 Prometheus 文本曝光格式返回引擎指标：规则数、版本数、在飞用户数、并发上限与最近 /match 延迟分位数。
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Prometheus exposition text
+          schema:
+            type: string
+      summary: Prometheus 指标
+      tags:
+      - probes
+  /ping:
+    get:
+      description: 轻量存活探针，返回 {"ping":"pong"}。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.PingResponse'
+      summary: 存活探针
+      tags:
+      - probes
+  /rules:
+    get:
+      description: 返回当前已加载（生效）规则的数量。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.RuleCountResponse'
+      summary: 规则数量
+      tags:
+      - scoring
+    post:
+      consumes:
+      - application/json
+      description: 新增或更新一条规则并立即生效（热更新）。
+      parameters:
+      - description: 规则对象
+        in: body
+        name: rule
+        required: true
+        schema:
+          $ref: '#/definitions/router.RuleInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.UpsertResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: 新增/更新规则
+      tags:
+      - rules
+  /rules/{id}:
+    delete:
+      description: 按 ID 删除一条规则（实时生效）。
+      parameters:
+      - description: 规则 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.DeleteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: 删除规则
+      tags:
+      - rules
+  /rules/list:
+    get:
+      description: 返回全部可编辑规则。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.RuleListResponse'
+      summary: 规则列表
+      tags:
+      - rules
+  /rules/selftest:
+    post:
+      consumes:
+      - application/json
+      description: 验证一条复杂规则的实时新增与删除。请求体可选（{rule,row}），缺省时使用内置旗舰规则与样例用户。
+      parameters:
+      - description: 自检请求（可选）
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/router.SelfTestRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.SelfTestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: 自检（热增删验证）
+      tags:
+      - rules
+  /rules/test:
+    post:
+      consumes:
+      - application/json
+      description: 对草稿规则文本针对一条样例 row 进行匹配测试，返回是否命中。
+      parameters:
+      - description: 草稿测试请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/router.RuleTestRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.RuleTestResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: 草稿规则测试
+      tags:
+      - rules
+  /versions:
+    get:
+      description: 返回所有已发布的规则集快照。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.VersionListResponse'
+      summary: 版本列表
+      tags:
+      - versions
+    post:
+      consumes:
+      - application/json
+      description: 将当前规则集快照为一个新版本（备注可选）。
+      parameters:
+      - description: 发布请求（可选备注）
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/router.PublishRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.PublishResponse'
+      summary: 发布版本
+      tags:
+      - versions
+  /versions/{v}/rollback:
+    post:
+      description: 将规则集回滚到指定版本快照（实时生效）。
+      parameters:
+      - description: 版本号
+        in: path
+        name: v
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/router.RollbackResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/router.ErrorResponse'
+      summary: 回滚版本
+      tags:
+      - versions
 schemes:
 - http
 swagger: "2.0"
