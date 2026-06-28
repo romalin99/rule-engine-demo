@@ -1,3 +1,10 @@
+// compare_test.go — 后端 A/B：自研字节码 VM vs qlbridge VM。
+//
+// 运行 / Run:  go test -bench=Backends -benchmem ./internal/benchmark/   (基准)
+//             go test -run TestBackendsAgree ./internal/benchmark/      (一致性)
+// 用例 / Cases: BenchmarkBackends(bytecode_native / bytecode_qlbridge / qlbridge_vm 吞吐对比)、
+//   TestBackendsAgree(自研 VM 与 qlbridge VM 命中一致)。注：CEL/Expr 尚未纳入对比。
+
 package benchmark
 
 import (
@@ -11,7 +18,7 @@ import (
 // BenchmarkBackends compares evaluation throughput of the custom bytecode VM
 // against qlbridge's own VM on the same rules + users.
 //
-//	go test -bench=Backends -benchmem ./benchmark/
+//	go test -bench=Backends -benchmem ./internal/benchmark/
 func BenchmarkBackends(b *testing.B) {
 	gen := ds.NewGenerator(seed)
 	rules := gen.Rules(2000)

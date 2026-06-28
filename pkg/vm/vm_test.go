@@ -1,3 +1,11 @@
+// vm_test.go — 字节码 VM（求值核心）单元测试。
+//
+// 运行 / Run:  go test ./pkg/vm/ -v
+// 用例 / Cases: TestCompileAndEval(编译+多行求值)、TestOperators(27 条单算子)、
+//   TestFullCoverageRule(旗舰规则: 1 命中 + 7 个各破坏一子句)、
+//   TestASTMatchesBytecode(AST 树遍历与字节码 VM 结果必须一致)、
+//   TestExplain(命中无 reasons / 未命中给出失败谓词)。
+
 package vm
 
 import (

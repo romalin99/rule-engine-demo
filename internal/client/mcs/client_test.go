@@ -1,5 +1,11 @@
 //go:build test
 
+// client_test.go — MCS HTTP 客户端单元测试(httptest mock)。带 build tag `test`。
+//
+// 运行 / Run:  go test -tags test ./internal/client/mcs/ -v
+// 覆盖：VerifyPlayerInfo / GetRegisterIP —— 全/部分匹配、非200、500、非法JSON、
+//   重试成功/耗尽、context 取消/超时、请求头、单例、Close 幂等。
+
 package mcs
 
 import (

@@ -1,5 +1,12 @@
 //go:build test
 
+// client_test.go — WPS HTTP 客户端单元测试(httptest mock)。带 build tag `test`。
+//
+// 运行 / Run:  go test -tags test ./internal/client/wps/ -v
+// 覆盖：GetResetPasswordStatus(邮箱/短信开关组合、非200、404、非法JSON、重试、ctx) + HTTPError。
+//
+// 注：原 import 误写为外部模块 tcg-rulex-engine/...，已修正为本模块路径(与 mcs/uss 一致)。
+
 package wps
 
 import (
@@ -11,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"tcg-ucs-fe/internal/client/clienthttp"
+	"tcg-rulex-engine/internal/client/clienthttp"
 )
 
 // newTestClient creates a Client directly, bypassing the globalOnce singleton,

@@ -1,3 +1,10 @@
+// ir_test.go — IR 解析（SQL→IR）与多 DSL 发射（SQL/CEL/Expr/Aviator）单元测试。
+//
+// 运行 / Run:  go test ./pkg/ir/ -v
+// 用例 / Cases: TestConvertMultiDSL(四 DSL 精确发射)、TestEqualityMapping、TestOrParens、
+//   TestLikeVariants、TestIsNull、TestParseErrors(非法表达式报错)、TestNegationConvert
+//   (<>/NOT IN/NOT LIKE/NOT(...))、TestFullCoverageRoundTrip(旗舰规则 + SQL 发射幂等)。
+
 package ir
 
 import (

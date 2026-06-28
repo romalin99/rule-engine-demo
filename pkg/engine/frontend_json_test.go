@@ -1,3 +1,9 @@
+// frontend_json_test.go — JSON 前端与 CEL/Expr 前端占位断言。
+//
+// 运行 / Run:  go test ./pkg/engine/ -run 'JSON|Stub' -v
+// 用例 / Cases: TestJSONFrontend(and/between/in/like/>=)、TestJSONFrontendNegation
+//   (not_in/not_like/{"not":...}/<>)、TestStubFrontends(⚠ 见下方注解，当前会失败)。
+
 package engine_test
 
 import (
@@ -42,6 +48,17 @@ func TestJSONFrontend(t *testing.T) {
 	}
 }
 
+// TestStubFrontends ⚠ STALE / 可能已过时：本用例断言 CELFrontend / ExprFrontend.Parse
+// 返回「未实现」错误。但二者现已委托给真实实现 pkg/parser/cel、pkg/parser/expr
+// (cel-go / expr-lang)，Parse("age >= 18") 会成功返回 IR —— 因此本用例当前会失败。
+// 修复二选一：(a) 改为断言解析成功(下方注释给出范式)；(b) 删除本用例。
+//
+//	// (a) 期望成功的写法：
+//	for _, fe := range []engine.Frontend{engine.CELFrontend{}, engine.ExprFrontend{}} {
+//		if node, err := fe.Parse("age >= 18"); err != nil || node == nil {
+//			t.Errorf("%s: expected successful parse, got node=%v err=%v", fe.Name(), node, err)
+//		}
+//	}
 func TestStubFrontends(t *testing.T) {
 	for _, fe := range []engine.Frontend{engine.CELFrontend{}, engine.ExprFrontend{}} {
 		if _, err := fe.Parse("age >= 18"); err == nil {

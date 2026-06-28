@@ -1,3 +1,9 @@
+// merchant_rule_test.go — 商户问卷规则 / 字段翻译解析（外围业务模块）。
+//
+// 运行 / Run:  go test ./internal/model/ -run MerchantRule -v
+// 用例 / Cases: ParseQuestions、有效问题过滤/GetValidQuestionInfos、序列化 round-trip、
+//   ParseFieldTranslationsMap、GetTranslationsByLanguage(精确/回退 EN/空/非法 JSON)。
+
 package model_test
 
 import (

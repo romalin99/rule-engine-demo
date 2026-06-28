@@ -1,3 +1,9 @@
+// topic_time_usage_test.go — 时长间隔单位归一化（外围业务模块）。
+//
+// 运行 / Run:  go test ./internal/model/ -run TimelimitUsage -v
+// 用例 / Cases: TestPlayerBeatTimelimitUsage_IntervalSeconds —— 各单位拼写、大小写不敏感、
+//   首尾空白、零间隔、未知单位跳过。
+
 package model_test
 
 import (

@@ -1,5 +1,11 @@
 //go:build test
 
+// client_test.go — USS HTTP 客户端单元测试(httptest mock)。带 build tag `test`。
+//
+// 运行 / Run:  go test -tags test ./internal/client/uss/ -v
+// 覆盖：GetCustomer / GeneratePasswordResetToken / GetCustomerPersonalInfo +
+//   NullString/NullInt32/FlexTime 解码。
+
 package uss
 
 import (

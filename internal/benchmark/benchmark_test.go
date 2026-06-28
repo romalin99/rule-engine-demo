@@ -2,7 +2,7 @@
 //
 // Run them with:
 //
-//	go test -bench=. -benchmem ./benchmark/
+//	go test -bench=. -benchmem ./internal/benchmark/
 //
 // BenchmarkRunBatch prints the headline block:
 //

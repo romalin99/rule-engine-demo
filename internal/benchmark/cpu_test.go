@@ -1,3 +1,9 @@
+// cpu_test.go — 扩展性基准（worker 数 / 规则数）。
+//
+// 运行 / Run:  go test -bench=Scaling -benchmem ./internal/benchmark/
+// 用例 / Cases: BenchmarkWorkersScaling(worker=1..64 批量吞吐)、
+//   BenchmarkRuleCountScaling(规则数 100..10000 单用户延迟)。
+
 package benchmark
 
 import (
@@ -7,7 +13,7 @@ import (
 
 // BenchmarkWorkersScaling shows how batch throughput scales with worker count.
 //
-//	go test -bench=WorkersScaling -benchmem ./benchmark/
+//	go test -bench=WorkersScaling -benchmem ./internal/benchmark/
 func BenchmarkWorkersScaling(b *testing.B) {
 	eng, users := buildEngine(b, 2000, 5000)
 

@@ -1,3 +1,10 @@
+// table_test.go — 决策表（Decision Table）单元测试。
+//
+// 运行 / Run:  go test ./pkg/dtable/ -v
+// 用例 / Cases: TestDecisionTableCompilesAndMatches —— 2 行决策表(between/in/like/isnull)
+//   → 编译成 2 条 SQL 规则(ID 从 IDBase 起)→ 引擎加载 → 用户命中两条，验证
+//   「行→IR→SQL→规则→匹配」全链路。
+
 package dtable_test
 
 import (

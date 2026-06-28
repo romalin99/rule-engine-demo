@@ -1,5 +1,11 @@
 //go:build test
 
+// model_error_test.go — USS 错误类型与可空 JSON 类型编解码（外围业务模块）。
+//
+// 运行 / Run:  go test -tags test ./internal/client/uss/ -v
+// 覆盖：HTTPError/IsHTTPError/IsProfileNotFound、FlexTime/NullString/NullInt32/NullInt
+//   的 Marshal/Unmarshal(零值/null/非法格式)。
+
 package uss
 
 import (
