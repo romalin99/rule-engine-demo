@@ -2,7 +2,7 @@
 //
 // Run it directly:
 //
-//	go run .
+// go run  cmd/api/main.go
 //
 // It generates 10,000 rules and 10,000 users, compiles every rule to a cached
 // qlbridge AST, then matches all users against all rules with a worker pool and
@@ -10,9 +10,9 @@
 //
 // Useful flags:
 //
-//	go run . -workers 32 -gen-rules 10000 -gen-users 10000
-//	go run . -rules data/rules.json -users data/users.json   # load from files
-//	go run . -demo                                            # named 5-rule demo
+//	go run  cmd/api/main.go -workers 32 -gen-rules 10000 -gen-users 10000
+//	go run  cmd/api/main.go -rules data/rules.json -users data/users.json   # load from files
+//	go run  cmd/api/main.go -demo                                            # named 5-rule demo
 package main
 
 import "tcg-rulex-engine/internal/cli"

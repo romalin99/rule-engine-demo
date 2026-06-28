@@ -1,6 +1,7 @@
 package router
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/gofiber/fiber/v3"
@@ -95,6 +96,86 @@ func (s *Server) handleEvaluate(c fiber.Ctx) error {
 		"reasons": reasons,
 		"rule":    rule,
 	})
+}
+
+// handleEvaluateAll godoc
+//
+//	@ID				evaluate_all
+//	@Summary		全规则评估（必须全部通过）
+//	@Description	接收一个宽表用户行，对引擎当前已加载的【全部规则】逐条求值。语义为"必须全部命中才算通过"：仅当用户命中所有规则时 passed=true。
+//	@Description	未通过时返回 failed_rule_ids（未命中规则的 ID）与 failed（每条未命中规则的完整 SQL 及未通过谓词原因 reasons）。
+//	@Description	请求体：{"uid": 可选, "row": {宽表字段...}}。规则集来源于 -serve -rules data/rules_60.json（60 条示例规则）。
+//	@Tags			Scoring
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		EvaluateAllRequest	true	"宽表用户（{\"row\": {...}}）"
+//	@Success		200		{object}	EvaluateAllResponse	"评估结果（passed + 未通过规则 + 原因）"
+//	@Failure		400		{object}	ErrorResponse		"JSON 解析失败或缺少 row"
+//	@Router			/evaluate/all [post]
+//
+// handleEvaluateAll runs one wide-table user against EVERY loaded rule and reports
+// whether it passes ALL of them (gate / allowlist semantics). For each rule the
+// user does not satisfy it returns that rule's ID, name, full SQL text and the
+// failing predicates (value-aware reasons), reusing the same Explain as /evaluate.
+func (s *Server) handleEvaluateAll(c fiber.Ctx) error {
+	var req struct {
+		UID int64          `json:"uid"`
+		Row map[string]any `json:"row"`
+	}
+	// Decode the raw body as JSON directly (like /match/batch) so the endpoint
+	// works regardless of the request Content-Type — `curl -d` defaults to
+	// application/x-www-form-urlencoded, which the struct binder would ignore
+	// (leaving row empty). This way the header is optional.
+	if err := json.Unmarshal(c.Body(), &req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "bad json: " + err.Error()})
+	}
+	if len(req.Row) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "missing 'row' (wide-table user fields)"})
+	}
+	return c.JSON(evaluateAll(s.eng.Cache().Snapshot(), req.UID, req.Row))
+}
+
+// evaluateAll runs one wide-table row against EVERY rule in snapshot using gate
+// semantics: Passed is true only when the row satisfies ALL rules (and there is
+// at least one rule). For each unsatisfied rule it records the rule ID, name,
+// full SQL text and the value-aware failing predicates (reasons). It is a pure
+// function (no transport), so it is unit-tested directly in evaluate_all_test.go.
+func evaluateAll(snapshot []*model.RuleProgram, uid int64, row map[string]any) EvaluateAllResponse {
+	res := EvaluateAllResponse{
+		UID:           uid,
+		TotalRules:    len(snapshot),
+		PassedRuleIDs: make([]int64, 0, len(snapshot)),
+		FailedRuleIDs: make([]int64, 0),
+		Failed:        make([]FailedRule, 0),
+	}
+	for _, p := range snapshot {
+		node, err := ir.Parse(p.Source)
+		if err != nil {
+			// A cached rule whose text cannot be re-parsed natively counts as not passed.
+			res.FailedRuleIDs = append(res.FailedRuleIDs, p.ID)
+			res.Failed = append(res.Failed, FailedRule{
+				RuleID:  p.ID,
+				Name:    p.Name,
+				Rule:    p.Source,
+				Reasons: []astrt.Reason{{Expr: p.Source, Detail: "rule text could not be parsed: " + err.Error()}},
+			})
+			continue
+		}
+		ok, reasons := astrt.Explain(node, row)
+		if ok {
+			res.PassedRuleIDs = append(res.PassedRuleIDs, p.ID)
+			continue
+		}
+		if reasons == nil {
+			reasons = []astrt.Reason{} // render [] instead of null
+		}
+		res.FailedRuleIDs = append(res.FailedRuleIDs, p.ID)
+		res.Failed = append(res.Failed, FailedRule{RuleID: p.ID, Name: p.Name, Rule: p.Source, Reasons: reasons})
+	}
+	res.PassedCount = len(res.PassedRuleIDs)
+	res.FailedCount = len(res.FailedRuleIDs)
+	res.Passed = res.TotalRules > 0 && res.FailedCount == 0 // must match ALL loaded rules
+	return res
 }
 
 // handleSelfTest godoc

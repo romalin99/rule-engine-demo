@@ -61,7 +61,8 @@ func (s *Server) App() *fiber.App {
 	app.Get("/metrics", s.handleMetrics)    // Prometheus text exposition
 	app.Post("/match", s.handleMatch)       // single user
 	app.Post("/match/batch", s.handleBatch) // array of users
-	app.Post("/evaluate", s.handleEvaluate) // pass/fail + reasons against one rule tree
+	app.Post("/evaluate", s.handleEvaluate)        // pass/fail + reasons against one rule tree
+	app.Post("/evaluate/all", s.handleEvaluateAll) // pass/fail vs ALL loaded rules + reasons (must match all)
 	// Operations console (step 11)
 	app.Get("/", s.handleEditor)             // web rule editor
 	app.Get("/rules/list", s.handleRuleList) // list editable rules
@@ -405,6 +406,7 @@ func Serve(addr string, eng *engine.Engine) error {
 	fmt.Println("  POST /match        single user  -> matched rules")
 	fmt.Println("  POST /match/batch  []user       -> matched rules")
 	fmt.Println("  POST /evaluate     row -> {passed, reasons[]} against one rule tree")
+	fmt.Println("  POST /evaluate/all row -> {passed, failed_rule_ids, failed[]} vs ALL loaded rules")
 	fmt.Println("  GET  /rules/list   list rules    POST /rules add/update    DELETE /rules/:id")
 	fmt.Println("  POST /rules/test   test a draft rule against a sample row")
 	fmt.Println("  POST /rules/selftest  live add a complex rule -> match -> delete (proof)")

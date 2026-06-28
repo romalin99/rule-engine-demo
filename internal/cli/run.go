@@ -32,7 +32,7 @@ type Config struct {
 	Watch     bool   // with -serve + -rules: hot-reload the rules file on change
 }
 
-// DefaultConfig returns the out-of-the-box configuration used by `go run .`.
+// DefaultConfig returns the out-of-the-box configuration used by `go run  cmd/api/main.go`.
 func DefaultConfig() Config {
 	return Config{
 		GenRules: 10000,

@@ -19,7 +19,7 @@ go test -bench=. -benchmem ./internal/benchmark/
 | `BenchmarkBackends`         | bytecode VM vs qlbridge VM      | TPS, ms/user             |
 
 `TPS` is rule-evaluations per second (`users × rules / elapsed`); `QPS` is
-users-scored per second. The headline run is `go run .` (10k rules × 10k users,
+users-scored per second. The headline run is `go run  cmd/api/main.go` (10k rules × 10k users,
 32 workers) which prints TPS / QPS / latency / hit-rate.
 
 ## Suggested matrix

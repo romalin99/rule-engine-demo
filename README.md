@@ -12,23 +12,23 @@ SQL / 表达式 / CEL / JSON，统一编译成字节码，由一个自研 VM 对
 
 ## ✨ Features
 
-| 能力 | 状态 |
-|------|------|
-| DSL 输入：SQL(qlbridge)、SQL(自研)、JSON Rule | ✅ |
-| DSL 输入：CEL、Expr | 🔶 扩展点已留（`frontend_stub.go`） |
-| 算子：`= <> != > >= < <=`、`BETWEEN`、`IN`/`NOT IN`、`LIKE`/`NOT LIKE`、`AND/OR`、`NOT (…)`、`IS [NOT] NULL`、括号优先级 | ✅ 原生/JSON 前端全覆盖 |
-| 统一 IR（`ir` 包） | ✅ |
-| 自研字节码 VM（`vm` 包，零分配、并发安全） | ✅ |
-| 可插拔后端：自研 VM ↔ qlbridge VM（可对比吞吐） | ✅ |
-| 规则缓存 `sync.Map`（10 万规则） | ✅ |
-| 宽表用户 `map[string]any`（100–500 字段，无反射） | ✅ |
-| Worker Pool 批量匹配 + TPS/QPS/Latency | ✅ |
-| 多 DSL 互转（SQL↔Aviator↔CEL↔Expr） | ✅ |
-| 实时打分 HTTP 服务（Fiber v3） | ✅ |
-| 热更新规则（增量 Add/Remove + 原子 Replace + 文件 Watcher） | ✅ |
-| Decision Table 输入（`dtable`：行→IR→SQL→规则） | ✅ 基础版 |
-| 后端 A/B 基准（自研 VM vs qlbridge VM） | ✅ |
-| struct / Arrow 列式输入 | ⏳ Roadmap |
+| 能力                                                                                                                     | 状态                                |
+| ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
+| DSL 输入：SQL(qlbridge)、SQL(自研)、JSON Rule                                                                            | ✅                                  |
+| DSL 输入：CEL、Expr                                                                                                      | 🔶 扩展点已留（`frontend_stub.go`） |
+| 算子：`= <> != > >= < <=`、`BETWEEN`、`IN`/`NOT IN`、`LIKE`/`NOT LIKE`、`AND/OR`、`NOT (…)`、`IS [NOT] NULL`、括号优先级 | ✅ 原生/JSON 前端全覆盖             |
+| 统一 IR（`ir` 包）                                                                                                       | ✅                                  |
+| 自研字节码 VM（`vm` 包，零分配、并发安全）                                                                               | ✅                                  |
+| 可插拔后端：自研 VM ↔ qlbridge VM（可对比吞吐）                                                                          | ✅                                  |
+| 规则缓存 `sync.Map`（10 万规则）                                                                                         | ✅                                  |
+| 宽表用户 `map[string]any`（100–500 字段，无反射）                                                                        | ✅                                  |
+| Worker Pool 批量匹配 + TPS/QPS/Latency                                                                                   | ✅                                  |
+| 多 DSL 互转（SQL↔Aviator↔CEL↔Expr）                                                                                      | ✅                                  |
+| 实时打分 HTTP 服务（Fiber v3）                                                                                           | ✅                                  |
+| 热更新规则（增量 Add/Remove + 原子 Replace + 文件 Watcher）                                                              | ✅                                  |
+| Decision Table 输入（`dtable`：行→IR→SQL→规则）                                                                          | ✅ 基础版                           |
+| 后端 A/B 基准（自研 VM vs qlbridge VM）                                                                                  | ✅                                  |
+| struct / Arrow 列式输入                                                                                                  | ⏳ Roadmap                          |
 
 完整规划见 [ROADMAP.md](ROADMAP.md)。
 
@@ -59,12 +59,12 @@ front-end 之一，不参与业务求值。
 
 ```bash
 go mod tidy
-go run .                 # 生成 1万规则 + 1万用户，32 worker，打印 TPS/QPS/Latency
+go run  cmd/api/main.go                 # 生成 1万规则 + 1万用户，32 worker，打印 TPS/QPS/Latency
 go test ./...            # 单元测试（engine / vm / ir）
 make bench               # 基准
 ```
 
-`go run .` 输出（数值为真实测量）：
+`go run  cmd/api/main.go` 输出（数值为真实测量）：
 
 ```
 CPU=10 GOMAXPROCS=10
@@ -117,12 +117,14 @@ engine.NewWithBackend(engine.NewBytecodeBackend(engine.JSONFrontend{}))   // JSO
 JSON Rule 示例（见 `data/rules_json.json`）：
 
 ```json
-{ "and": [
-  {"field":"age","op":"between","values":[25,40]},
-  {"field":"province","op":"in","values":["广东","江苏"]},
-  {"field":"favorite_category","op":"like","value":"数%"},
-  {"field":"active_score","op":">=","value":85}
-]}
+{
+  "and": [
+    { "field": "age", "op": "between", "values": [25, 40] },
+    { "field": "province", "op": "in", "values": ["广东", "江苏"] },
+    { "field": "favorite_category", "op": "like", "value": "数%" },
+    { "field": "active_score", "op": ">=", "value": 85 }
+  ]
+}
 ```
 
 JSON DSL 也支持取反算子 `not_in` / `not_like` 与 `{"not": <node>}` 包裹，
@@ -158,9 +160,9 @@ Aviator: !((income_level == '<5k' || income_level == '5k-10k')) && !(risk_level 
 因此 `-demo` 已固定走原生前端：
 
 ```bash
-go run . -demo                 # data/rules.json（含规则 #6）对 data/users.json 实时匹配
+go run  cmd/api/main.go -demo                 # data/rules.json（含规则 #6）对 data/users.json 实时匹配
 go run ./examples/allops       # 解析→IR→字节码/树遍历双执行→四种 DSL 互转
-go run . -rules data/rules.json -users data/users.json -frontend native
+go run  cmd/api/main.go -rules data/rules.json -users data/users.json -frontend native
 ```
 
 > qlbridge 前端尚未映射取反 AST（`NOT IN`/`NOT LIKE`/`NOT(...)` 会被记为 `failed`，
@@ -172,15 +174,16 @@ go run . -rules data/rules.json -users data/users.json -frontend native
 ## 🧰 CLI
 
 ```bash
-go run . -workers 32 -gen-rules 10000 -gen-users 10000   # 基准
-go run . -rules data/rules.json -users data/users.json   # 从文件加载
-go run . -demo                                           # 命名 5 规则可读演示
-go run . -serve :8080                                    # 实时打分 HTTP 服务
-go run . -export cel -rules data/rules.json              # 规则转 DSL
-go run . -frontend native                                # 换自研 SQL parser
-go run . -backend qlbridge                               # 对照：qlbridge VM
-go run . -serve :8080 -rules data/rules.json -watch      # 实时服务 + 规则热更新
-go run . -gen-rules 1000000 -gen-users 1000000           # 百万级（需足够内存）
+go run  cmd/api/main.go -workers 32 -gen-rules 10000 -gen-users 10000   # 基准
+go run  cmd/api/main.go -rules data/rules.json -users data/users.json   # 从文件加载
+go run  cmd/api/main.go -demo                                           # 命名 5 规则可读演示
+go run  cmd/api/main.go -serve :8080                                    # 实时打分 HTTP 服务
+go run  cmd/api/main.go -export cel -rules data/rules.json              # 规则转 DSL
+go run  cmd/api/main.go -frontend native                                # 换自研 SQL parser
+go run  cmd/api/main.go -backend qlbridge                               # 对照：qlbridge VM
+go run  cmd/api/main.go -serve :8080 -rules data/rules.json -watch      # 实时服务 + 规则热更新
+go run  cmd/api/main.go -serve :8080 -rules data/rules_60.json          # 60 条示例规则（/evaluate/all 演示）
+go run  cmd/api/main.go -gen-rules 1000000 -gen-users 1000000           # 百万级（需足够内存）
 ```
 
 热更新 API（库内）：`AddRule` / `RemoveRule` 增量更新，`ReplaceRules` / `ReloadFromFile`
@@ -259,21 +262,22 @@ eng := engine.NewWithParserRuntime(qp.New(), bc.New()) // 解析↔执行 自由
 
 ## 🖥 运营控制台（热更新 + 版本/回滚）
 
-`go run . -serve :8080` 后打开 <http://localhost:8080/>：在线编辑、**测试**、**发布（实时生效）**、
+`go run cmd/api/main.go -serve :8080` 后打开 <http://localhost:8080/>：在线编辑、**测试**、**发布（实时生效）**、
 **快照版本**、**回滚**。对应 HTTP API：
 
 ```
 GET  /rules/list            POST /rules            DELETE /rules/:id     # 增删查（实时生效）
 POST /rules/test            # {"rule":"...","row":{...}} → {"matched":bool}
 POST /rules/selftest        # 复杂规则“加→命中→删”实时生效自检（见下）
-POST /evaluate              # 宽表用户 → {passed, reasons[]}（见下）
+POST /evaluate              # 宽表用户 → {passed, reasons[]}（单条规则树，见下）
+POST /evaluate/all          # 宽表用户 → 对【全部规则】求值 {passed, failed_rule_ids, failed[]}（见下）
 POST /versions              POST /versions/:v/rollback                    # 快照 / 回滚
 ```
 
-> `-serve` 默认走原生 SQL 前端，支持全部算子（含 `NOT IN`/`NOT LIKE`/`NOT(...)`），
+> `-serve` 默认走原生 SQL 前端，支持全部算子（含 `=`/`<>`/`>`/`>=`/`<`/`<=`/`BETWEEN`/`IN`/`NOT IN`/`LIKE`/`NOT LIKE`/`IS NULL`/`IS NOT NULL`/`AND`/`OR`/`NOT``NOT(...)`/`括号优先级`/`逻辑运算`/`多层逻辑组合`/`其它等`），
 > 因此上述实时增删与 `/evaluate` 可直接使用旗舰规则。
 
-### POST /evaluate — 是否通过规则树 + 未通过原因
+### POST /evaluate — 是否通过规则树(规则引擎) + 未通过原因
 
 传入宽表用户数据，返回是否通过某条规则树；未通过时逐条给出失败原因（含实际取值）。
 缺省评估全算子旗舰规则，也可传 `rule`（SQL）或已加载规则的 `rule_id`：
@@ -294,6 +298,29 @@ curl -s localhost:8080/evaluate -H 'Content-Type: application/json' -d '{
 ```
 
 通过时 `passed=true` 且 `reasons` 为空数组。
+
+### POST /evaluate/all — 对【全部已加载规则】评估（必须全部命中才通过）
+
+传入一个宽表用户，对引擎当前加载的**所有规则**逐条求值。语义为「必须全部命中才算通过」：
+仅当用户命中全部规则时 `passed=true`；未通过时返回未命中规则的 ID 列表 `failed_rule_ids`，
+以及每条未命中规则的**完整 SQL** 与失败谓词原因 `failed[].reasons`。配套 60 条示例规则
+（40 条复杂，含旗舰全算子规则）见 `data/rules_60.json`：
+
+```bash
+go run cmd/api/main.go -serve :8080 -rules data/rules_60.json    # 加载 60 条规则
+curl -s localhost:8080/evaluate/all -H 'Content-Type: application/json' -d '{
+  "row": {"age":21,"province":"江苏","income_level":"<5k","favorite_category":"图书",
+          "occupation":"在校学生","active_score":70,"credit_score":660,"total_amount":1200,
+          "avg_order_amount":1500,"risk_level":"高","marital_status":"未知","register_days":30}
+}'
+# -> {"passed":false,"total_rules":60,"passed_count":0,"failed_count":60,
+#     "failed_rule_ids":[1001,1002, ... ],
+#     "failed":[{"rule_id":1001,"name":"全算子覆盖-精准圈选(旗舰)",
+#                "rule":"age BETWEEN 25 AND 40 AND ... AND marital_status <> '未知'",
+#                "reasons":[{"expr":"age BETWEEN 25 AND 40","detail":"age=21 is outside [25, 40]"}, ... ]}, ... ]}
+```
+
+命中全部规则时 `passed=true` 且 `failed` 为空数组。
 
 ### POST /rules/selftest — 复杂规则热更新自检
 

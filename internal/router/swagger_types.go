@@ -63,6 +63,14 @@ type EvaluateRequest struct {
 	Row UserRow `json:"row"`
 }
 
+// EvaluateAllRequest is the body of POST /evaluate/all: a wide-table user row
+// evaluated against EVERY loaded rule (gate semantics).
+type EvaluateAllRequest struct {
+	UID int64 `json:"uid" example:"1"`
+	// The wide-table user row evaluated against all loaded rules.
+	Row UserRow `json:"row"`
+}
+
 // RuleTestRequest is the body of POST /rules/test.
 type RuleTestRequest struct {
 	Rule string  `json:"rule" example:"age >= 30 AND vip_level >= 2 AND total_amount > 5000"`
@@ -138,6 +146,28 @@ type EvaluateResponse struct {
 	Passed  bool         `json:"passed" example:"false"`
 	Reasons []ast.Reason `json:"reasons"`
 	Rule    string       `json:"rule" example:"age BETWEEN 25 AND 40 AND active_score >= 85"`
+}
+
+// FailedRule is one rule the user did not satisfy (element of EvaluateAllResponse.Failed).
+type FailedRule struct {
+	RuleID  int64        `json:"rule_id" example:"1001"`
+	Name    string       `json:"name" example:"全算子覆盖-精准圈选(旗舰)"`
+	Rule    string       `json:"rule" example:"age BETWEEN 25 AND 40 AND ... AND marital_status <> '未知'"`
+	Reasons []ast.Reason `json:"reasons"`
+}
+
+// EvaluateAllResponse is returned by POST /evaluate/all. passed is true only when
+// the user matches EVERY loaded rule; otherwise failed lists each unsatisfied rule
+// with its ID, full SQL text and the failing predicates (reasons).
+type EvaluateAllResponse struct {
+	UID           int64        `json:"uid" example:"1"`
+	Passed        bool         `json:"passed" example:"false"`
+	TotalRules    int          `json:"total_rules" example:"60"`
+	PassedCount   int          `json:"passed_count" example:"2"`
+	FailedCount   int          `json:"failed_count" example:"58"`
+	PassedRuleIDs []int64      `json:"passed_rule_ids"`
+	FailedRuleIDs []int64      `json:"failed_rule_ids"`
+	Failed        []FailedRule `json:"failed"`
 }
 
 // PublishResponse is returned by POST /versions.

@@ -1,0 +1,422 @@
+[
+  {
+    "id": 1001,
+    "name": "全算子覆盖-精准圈选(旗舰)",
+    "priority": 10,
+    "enabled": true,
+    "expr": "age BETWEEN 25 AND 40 AND province IN ('广东','江苏','浙江') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '数%' AND occupation NOT LIKE '%学生%' AND active_score >= 85 AND credit_score BETWEEN 700 AND 850 AND total_amount > 5000 AND avg_order_amount <= 1000 AND last_login_time IS NOT NULL AND (vip_level >= 3 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1002,
+    "name": "高价值精准圈选-复杂规则#02",
+    "priority": 11,
+    "enabled": true,
+    "expr": "gender = '女' AND age BETWEEN 25 AND 43 AND province IN ('浙江','上海','北京','山东') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '母%' AND city NOT LIKE '%县' AND active_score >= 78 AND credit_score >= 680 AND total_amount BETWEEN 4000 AND 80000 AND login_days_30d >= 20 AND (vip_level >= 3 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 250 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1003,
+    "name": "高价值精准圈选-复杂规则#03",
+    "priority": 12,
+    "enabled": true,
+    "expr": "age >= 28 AND age <= 42 AND province NOT IN ('北京','山东','四川') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%家%' AND occupation NOT LIKE '%学生%' AND active_score > 86 AND credit_score BETWEEN 740 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 12000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 360"
+  },
+  {
+    "id": 1004,
+    "name": "高价值精准圈选-复杂规则#04",
+    "priority": 13,
+    "enabled": true,
+    "expr": "gender <> '未知' AND age BETWEEN 28 AND 39 AND province IN ('四川','湖北','福建','湖南','广东') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 85 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 30 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
+  },
+  {
+    "id": 1005,
+    "name": "高价值精准圈选-复杂规则#05",
+    "priority": 14,
+    "enabled": true,
+    "expr": "age BETWEEN 25 AND 40 AND province IN ('北京','山东','四川') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '家%' AND occupation NOT LIKE '%实习%' AND active_score >= 80 AND credit_score BETWEEN 700 AND 840 AND total_amount > 9000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 4 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1006,
+    "name": "高价值精准圈选-复杂规则#06",
+    "priority": 15,
+    "enabled": true,
+    "expr": "gender = '女' AND age BETWEEN 30 AND 46 AND province IN ('四川','湖北','福建','湖南') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '食%' AND city NOT LIKE '%县' AND active_score >= 75 AND credit_score >= 680 AND total_amount BETWEEN 5000 AND 80000 AND login_days_30d >= 25 AND (vip_level >= 4 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 300 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1007,
+    "name": "高价值精准圈选-复杂规则#07",
+    "priority": 10,
+    "enabled": true,
+    "expr": "age >= 24 AND age <= 42 AND province NOT IN ('福建','湖南','广东') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%数%' AND occupation NOT LIKE '%实习%' AND active_score > 82 AND credit_score BETWEEN 700 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 8000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 240"
+  },
+  {
+    "id": 1008,
+    "name": "高价值精准圈选-复杂规则#08",
+    "priority": 11,
+    "enabled": true,
+    "expr": "gender <> '未知' AND age BETWEEN 28 AND 41 AND province IN ('广东','江苏','浙江','上海','北京') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 86 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 40 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
+  },
+  {
+    "id": 1009,
+    "name": "高价值精准圈选-复杂规则#09",
+    "priority": 12,
+    "enabled": true,
+    "expr": "age BETWEEN 28 AND 42 AND province IN ('福建','湖南','广东') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '数%' AND occupation NOT LIKE '%兼职%' AND active_score >= 80 AND credit_score BETWEEN 720 AND 840 AND total_amount > 8000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 5 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1010,
+    "name": "高价值精准圈选-复杂规则#10",
+    "priority": 13,
+    "enabled": true,
+    "expr": "gender = '女' AND age BETWEEN 20 AND 40 AND province IN ('广东','江苏','浙江','上海') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '母%' AND city NOT LIKE '%县' AND active_score >= 87 AND credit_score >= 680 AND total_amount BETWEEN 3000 AND 80000 AND login_days_30d >= 15 AND (vip_level >= 2 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 200 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1011,
+    "name": "高价值精准圈选-复杂规则#11",
+    "priority": 14,
+    "enabled": true,
+    "expr": "age >= 26 AND age <= 42 AND province NOT IN ('浙江','上海','北京') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%家%' AND occupation NOT LIKE '%兼职%' AND active_score > 84 AND credit_score BETWEEN 720 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 10000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 300"
+  },
+  {
+    "id": 1012,
+    "name": "高价值精准圈选-复杂规则#12",
+    "priority": 15,
+    "enabled": true,
+    "expr": "gender <> '未知' AND age BETWEEN 28 AND 43 AND province IN ('北京','山东','四川','湖北','福建') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 87 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 50 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
+  },
+  {
+    "id": 1013,
+    "name": "高价值精准圈选-复杂规则#13",
+    "priority": 10,
+    "enabled": true,
+    "expr": "age BETWEEN 22 AND 38 AND province IN ('浙江','上海','北京') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '家%' AND occupation NOT LIKE '%学生%' AND active_score >= 80 AND credit_score BETWEEN 680 AND 840 AND total_amount > 7000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 3 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1014,
+    "name": "高价值精准圈选-复杂规则#14",
+    "priority": 11,
+    "enabled": true,
+    "expr": "gender = '女' AND age BETWEEN 25 AND 43 AND province IN ('北京','山东','四川','湖北') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '食%' AND city NOT LIKE '%县' AND active_score >= 84 AND credit_score >= 680 AND total_amount BETWEEN 4000 AND 80000 AND login_days_30d >= 20 AND (vip_level >= 3 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 250 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1015,
+    "name": "高价值精准圈选-复杂规则#15",
+    "priority": 12,
+    "enabled": true,
+    "expr": "age >= 28 AND age <= 42 AND province NOT IN ('四川','湖北','福建') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%数%' AND occupation NOT LIKE '%学生%' AND active_score > 86 AND credit_score BETWEEN 740 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 12000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 360"
+  },
+  {
+    "id": 1016,
+    "name": "高价值精准圈选-复杂规则#16",
+    "priority": 13,
+    "enabled": true,
+    "expr": "gender <> '未知' AND age BETWEEN 28 AND 39 AND province IN ('福建','湖南','广东','江苏','浙江') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 85 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 30 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
+  },
+  {
+    "id": 1017,
+    "name": "高价值精准圈选-复杂规则#17",
+    "priority": 14,
+    "enabled": true,
+    "expr": "age BETWEEN 25 AND 40 AND province IN ('四川','湖北','福建') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '数%' AND occupation NOT LIKE '%实习%' AND active_score >= 80 AND credit_score BETWEEN 700 AND 840 AND total_amount > 6000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 4 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1018,
+    "name": "高价值精准圈选-复杂规则#18",
+    "priority": 15,
+    "enabled": true,
+    "expr": "gender = '女' AND age BETWEEN 30 AND 46 AND province IN ('福建','湖南','广东','江苏') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '母%' AND city NOT LIKE '%县' AND active_score >= 81 AND credit_score >= 680 AND total_amount BETWEEN 5000 AND 80000 AND login_days_30d >= 25 AND (vip_level >= 4 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 300 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1019,
+    "name": "高价值精准圈选-复杂规则#19",
+    "priority": 10,
+    "enabled": true,
+    "expr": "age >= 24 AND age <= 42 AND province NOT IN ('广东','江苏','浙江') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%家%' AND occupation NOT LIKE '%实习%' AND active_score > 82 AND credit_score BETWEEN 700 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 8000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 240"
+  },
+  {
+    "id": 1020,
+    "name": "高价值精准圈选-复杂规则#20",
+    "priority": 11,
+    "enabled": true,
+    "expr": "gender <> '未知' AND age BETWEEN 28 AND 41 AND province IN ('浙江','上海','北京','山东','四川') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 86 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 40 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
+  },
+  {
+    "id": 1021,
+    "name": "高价值精准圈选-复杂规则#21",
+    "priority": 12,
+    "enabled": true,
+    "expr": "age BETWEEN 28 AND 42 AND province IN ('广东','江苏','浙江') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '家%' AND occupation NOT LIKE '%兼职%' AND active_score >= 80 AND credit_score BETWEEN 720 AND 840 AND total_amount > 5000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 5 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1022,
+    "name": "高价值精准圈选-复杂规则#22",
+    "priority": 13,
+    "enabled": true,
+    "expr": "gender = '女' AND age BETWEEN 20 AND 40 AND province IN ('浙江','上海','北京','山东') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '食%' AND city NOT LIKE '%县' AND active_score >= 78 AND credit_score >= 680 AND total_amount BETWEEN 3000 AND 80000 AND login_days_30d >= 15 AND (vip_level >= 2 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 200 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1023,
+    "name": "高价值精准圈选-复杂规则#23",
+    "priority": 14,
+    "enabled": true,
+    "expr": "age >= 26 AND age <= 42 AND province NOT IN ('北京','山东','四川') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%数%' AND occupation NOT LIKE '%兼职%' AND active_score > 84 AND credit_score BETWEEN 720 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 10000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 300"
+  },
+  {
+    "id": 1024,
+    "name": "高价值精准圈选-复杂规则#24",
+    "priority": 15,
+    "enabled": true,
+    "expr": "gender <> '未知' AND age BETWEEN 28 AND 43 AND province IN ('四川','湖北','福建','湖南','广东') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 87 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 50 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
+  },
+  {
+    "id": 1025,
+    "name": "高价值精准圈选-复杂规则#25",
+    "priority": 10,
+    "enabled": true,
+    "expr": "age BETWEEN 22 AND 38 AND province IN ('北京','山东','四川') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '数%' AND occupation NOT LIKE '%学生%' AND active_score >= 80 AND credit_score BETWEEN 680 AND 840 AND total_amount > 9000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 3 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1026,
+    "name": "高价值精准圈选-复杂规则#26",
+    "priority": 11,
+    "enabled": true,
+    "expr": "gender = '女' AND age BETWEEN 25 AND 43 AND province IN ('四川','湖北','福建','湖南') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '母%' AND city NOT LIKE '%县' AND active_score >= 75 AND credit_score >= 680 AND total_amount BETWEEN 4000 AND 80000 AND login_days_30d >= 20 AND (vip_level >= 3 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 250 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1027,
+    "name": "高价值精准圈选-复杂规则#27",
+    "priority": 12,
+    "enabled": true,
+    "expr": "age >= 28 AND age <= 42 AND province NOT IN ('福建','湖南','广东') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%家%' AND occupation NOT LIKE '%学生%' AND active_score > 86 AND credit_score BETWEEN 740 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 12000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 360"
+  },
+  {
+    "id": 1028,
+    "name": "高价值精准圈选-复杂规则#28",
+    "priority": 13,
+    "enabled": true,
+    "expr": "gender <> '未知' AND age BETWEEN 28 AND 39 AND province IN ('广东','江苏','浙江','上海','北京') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 85 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 30 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
+  },
+  {
+    "id": 1029,
+    "name": "高价值精准圈选-复杂规则#29",
+    "priority": 14,
+    "enabled": true,
+    "expr": "age BETWEEN 25 AND 40 AND province IN ('福建','湖南','广东') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '家%' AND occupation NOT LIKE '%实习%' AND active_score >= 80 AND credit_score BETWEEN 700 AND 840 AND total_amount > 8000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 4 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1030,
+    "name": "高价值精准圈选-复杂规则#30",
+    "priority": 15,
+    "enabled": true,
+    "expr": "gender = '女' AND age BETWEEN 30 AND 46 AND province IN ('广东','江苏','浙江','上海') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '食%' AND city NOT LIKE '%县' AND active_score >= 87 AND credit_score >= 680 AND total_amount BETWEEN 5000 AND 80000 AND login_days_30d >= 25 AND (vip_level >= 4 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 300 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1031,
+    "name": "高价值精准圈选-复杂规则#31",
+    "priority": 10,
+    "enabled": true,
+    "expr": "age >= 24 AND age <= 42 AND province NOT IN ('浙江','上海','北京') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%数%' AND occupation NOT LIKE '%实习%' AND active_score > 82 AND credit_score BETWEEN 700 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 8000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 240"
+  },
+  {
+    "id": 1032,
+    "name": "高价值精准圈选-复杂规则#32",
+    "priority": 11,
+    "enabled": true,
+    "expr": "gender <> '未知' AND age BETWEEN 28 AND 41 AND province IN ('北京','山东','四川','湖北','福建') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 86 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 40 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
+  },
+  {
+    "id": 1033,
+    "name": "高价值精准圈选-复杂规则#33",
+    "priority": 12,
+    "enabled": true,
+    "expr": "age BETWEEN 28 AND 42 AND province IN ('浙江','上海','北京') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '数%' AND occupation NOT LIKE '%兼职%' AND active_score >= 80 AND credit_score BETWEEN 720 AND 840 AND total_amount > 7000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 5 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1034,
+    "name": "高价值精准圈选-复杂规则#34",
+    "priority": 13,
+    "enabled": true,
+    "expr": "gender = '女' AND age BETWEEN 20 AND 40 AND province IN ('北京','山东','四川','湖北') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '母%' AND city NOT LIKE '%县' AND active_score >= 84 AND credit_score >= 680 AND total_amount BETWEEN 3000 AND 80000 AND login_days_30d >= 15 AND (vip_level >= 2 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 200 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1035,
+    "name": "高价值精准圈选-复杂规则#35",
+    "priority": 14,
+    "enabled": true,
+    "expr": "age >= 26 AND age <= 42 AND province NOT IN ('四川','湖北','福建') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%家%' AND occupation NOT LIKE '%兼职%' AND active_score > 84 AND credit_score BETWEEN 720 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 10000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 300"
+  },
+  {
+    "id": 1036,
+    "name": "高价值精准圈选-复杂规则#36",
+    "priority": 15,
+    "enabled": true,
+    "expr": "gender <> '未知' AND age BETWEEN 28 AND 43 AND province IN ('福建','湖南','广东','江苏','浙江') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 87 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 50 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
+  },
+  {
+    "id": 1037,
+    "name": "高价值精准圈选-复杂规则#37",
+    "priority": 10,
+    "enabled": true,
+    "expr": "age BETWEEN 22 AND 38 AND province IN ('四川','湖北','福建') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category LIKE '家%' AND occupation NOT LIKE '%学生%' AND active_score >= 80 AND credit_score BETWEEN 680 AND 840 AND total_amount > 6000 AND avg_order_amount <= 800 AND last_login_time IS NOT NULL AND (vip_level >= 3 OR order_count >= 20) AND NOT (risk_level = '高') AND register_days >= 180 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1038,
+    "name": "高价值精准圈选-复杂规则#38",
+    "priority": 11,
+    "enabled": true,
+    "expr": "gender = '女' AND age BETWEEN 25 AND 43 AND province IN ('福建','湖南','广东','江苏') AND device_type IN ('iPhone','Huawei','Xiaomi') AND income_level NOT IN ('<5k') AND favorite_category LIKE '食%' AND city NOT LIKE '%县' AND active_score >= 81 AND credit_score >= 680 AND total_amount BETWEEN 4000 AND 80000 AND login_days_30d >= 20 AND (vip_level >= 3 OR order_count >= 30) AND NOT (risk_level = '高') AND register_days >= 250 AND marital_status <> '未知'"
+  },
+  {
+    "id": 1039,
+    "name": "高价值精准圈选-复杂规则#39",
+    "priority": 12,
+    "enabled": true,
+    "expr": "age >= 28 AND age <= 42 AND province NOT IN ('广东','江苏','浙江') AND income_level IN ('20k-30k','30k+') AND favorite_category LIKE '%数%' AND occupation NOT LIKE '%学生%' AND active_score > 86 AND credit_score BETWEEN 740 AND 850 AND avg_order_amount < 800 AND last_login_time IS NOT NULL AND coupon_used IS NULL AND (vip_level >= 3 OR total_amount >= 12000) AND NOT (risk_level = '高' OR credit_score < 500) AND register_days >= 360"
+  },
+  {
+    "id": 1040,
+    "name": "高价值精准圈选-复杂规则#40",
+    "priority": 13,
+    "enabled": true,
+    "expr": "gender <> '未知' AND age BETWEEN 28 AND 39 AND province IN ('浙江','上海','北京','山东','四川') AND income_level NOT IN ('<5k','5k-10k') AND favorite_category IN ('数码','美妆','母婴','图书') AND occupation NOT LIKE '%学生%' AND active_score >= 85 AND credit_score BETWEEN 720 AND 850 AND total_amount > 10500 AND order_count >= 30 AND last_login_time IS NOT NULL AND (city LIKE '深%' OR city LIKE '广%') AND NOT (risk_level = '高') AND marital_status <> '未知'"
+  },
+  {
+    "id": 1041,
+    "name": "基础圈选-高活跃用户",
+    "priority": 5,
+    "enabled": true,
+    "expr": "active_score >= 90"
+  },
+  {
+    "id": 1042,
+    "name": "基础圈选-高级会员",
+    "priority": 5,
+    "enabled": true,
+    "expr": "vip_level >= 5"
+  },
+  {
+    "id": 1043,
+    "name": "基础圈选-高信用",
+    "priority": 5,
+    "enabled": true,
+    "expr": "credit_score > 700"
+  },
+  {
+    "id": 1044,
+    "name": "基础圈选-年轻客群",
+    "priority": 5,
+    "enabled": true,
+    "expr": "age BETWEEN 18 AND 25"
+  },
+  {
+    "id": 1045,
+    "name": "基础圈选-华东两省",
+    "priority": 5,
+    "enabled": true,
+    "expr": "province IN ('广东','江苏')"
+  },
+  {
+    "id": 1046,
+    "name": "基础圈选-高消费",
+    "priority": 5,
+    "enabled": true,
+    "expr": "total_amount > 10000"
+  },
+  {
+    "id": 1047,
+    "name": "基础圈选-女性客群",
+    "priority": 5,
+    "enabled": true,
+    "expr": "gender = '女'"
+  },
+  {
+    "id": 1048,
+    "name": "基础圈选-低风险",
+    "priority": 5,
+    "enabled": true,
+    "expr": "risk_level = '低'"
+  },
+  {
+    "id": 1049,
+    "name": "基础圈选-高频下单",
+    "priority": 5,
+    "enabled": true,
+    "expr": "order_count >= 50"
+  },
+  {
+    "id": 1050,
+    "name": "基础圈选-近月活跃",
+    "priority": 5,
+    "enabled": true,
+    "expr": "login_days_30d >= 20"
+  },
+  {
+    "id": 1051,
+    "name": "基础圈选-数码偏好",
+    "priority": 5,
+    "enabled": true,
+    "expr": "favorite_category LIKE '数%'"
+  },
+  {
+    "id": 1052,
+    "name": "基础圈选-中高收入",
+    "priority": 5,
+    "enabled": true,
+    "expr": "income_level IN ('20k-30k','30k+')"
+  },
+  {
+    "id": 1053,
+    "name": "基础圈选-老用户",
+    "priority": 5,
+    "enabled": true,
+    "expr": "register_days >= 365"
+  },
+  {
+    "id": 1054,
+    "name": "基础圈选-婚况已知",
+    "priority": 5,
+    "enabled": true,
+    "expr": "marital_status <> '未知'"
+  },
+  {
+    "id": 1055,
+    "name": "基础圈选-小额客单",
+    "priority": 5,
+    "enabled": true,
+    "expr": "avg_order_amount <= 500"
+  },
+  {
+    "id": 1056,
+    "name": "基础圈选-苹果设备",
+    "priority": 5,
+    "enabled": true,
+    "expr": "device_type = 'iPhone'"
+  },
+  {
+    "id": 1057,
+    "name": "基础圈选-非学生",
+    "priority": 5,
+    "enabled": true,
+    "expr": "occupation NOT LIKE '%学生%'"
+  },
+  {
+    "id": 1058,
+    "name": "基础圈选-一线城市",
+    "priority": 5,
+    "enabled": true,
+    "expr": "city LIKE '深%' OR city LIKE '广%'"
+  },
+  {
+    "id": 1059,
+    "name": "基础圈选-活跃会员",
+    "priority": 5,
+    "enabled": true,
+    "expr": "vip_level >= 2 AND active_score >= 80"
+  },
+  {
+    "id": 1060,
+    "name": "基础圈选-成熟高消费",
+    "priority": 5,
+    "enabled": true,
+    "expr": "age >= 30 AND total_amount > 5000"
+  }
+]
