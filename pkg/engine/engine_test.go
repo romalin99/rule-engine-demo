@@ -1,11 +1,18 @@
+// engine_test.go — 引擎装配/加载/匹配单元测试（共享 namedRules / sampleUsers 夹具）。
+//
+// 运行 / Run:  go test ./pkg/engine/ -v
+// 用例 / Cases: TestLoadAndMatch(禁用规则不加载 + 固定命中答案)、TestFrontendsAgree
+//   (qlbridge 前端与原生前端命中一致)、TestBatchEqualsSingle(批量=逐个 + 统计校验)、
+//   TestMatcherInterface(默认引擎经 Matcher 接口加载/计数)。
+
 package engine_test
 
 import (
 	"sort"
 	"testing"
 
-	"github.com/example/rule-engine-demo/pkg/engine"
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/engine"
+	"tcg-rulex-engine/pkg/model"
 )
 
 func namedRules() []model.Rule {

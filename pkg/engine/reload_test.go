@@ -1,10 +1,16 @@
+// reload_test.go — 规则热更新单元测试。
+//
+// 运行 / Run:  go test ./pkg/engine/ -run TestHotReload -v
+// 用例 / Cases: TestHotReload —— 加载→AddRule→RemoveRule→ReplaceRules(原子全量)→
+//   坏规则 AddRule 失败且不改变规则集，逐步校验 RuleCount 与命中。
+
 package engine_test
 
 import (
 	"testing"
 
-	"github.com/example/rule-engine-demo/pkg/engine"
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/engine"
+	"tcg-rulex-engine/pkg/model"
 )
 
 func TestHotReload(t *testing.T) {

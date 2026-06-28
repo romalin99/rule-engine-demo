@@ -3,7 +3,7 @@
 package datasource
 
 import (
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/model"
 )
 
 // UserStore is an in-memory collection of users with a UID index.

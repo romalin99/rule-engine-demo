@@ -5,7 +5,7 @@ import (
 	"math/rand"
 	"strings"
 
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/model"
 )
 
 // Domain value pools used by both the user generator and the rule generator so
@@ -17,18 +17,18 @@ var (
 		"上海": {"上海"}, "北京": {"北京"}, "四川": {"成都", "绵阳"}, "山东": {"济南", "青岛"},
 		"湖北": {"武汉", "宜昌"}, "福建": {"福州", "厦门"}, "湖南": {"长沙", "株洲"},
 	}
-	genders        = []string{"男", "女"}
-	occupations    = []string{"程序员", "教师", "销售", "学生", "产品经理", "设计师", "医生", "律师", "自由职业", "公务员"}
-	educations     = []string{"高中", "大专", "本科", "硕士", "博士"}
-	maritalStatus  = []string{"未婚", "已婚", "离异"}
-	incomeLevels   = []string{"<5k", "5k-10k", "10k-20k", "15k-20k", "20k-30k", "30k+"}
-	categories     = []string{"数码", "数码产品", "图书", "汽车", "美妆", "家电", "服饰", "食品", "母婴", "运动"}
-	deviceTypes    = []string{"iPhone", "Android", "iPad", "Windows", "Mac"}
-	osTypes        = []string{"iOS", "Android", "Windows", "macOS"}
-	browsers       = []string{"Safari", "Chrome", "Edge", "Firefox"}
-	appVersions    = []string{"8.0.0", "8.1.5", "8.2.0", "8.2.1", "9.0.0"}
-	riskLevels     = []string{"低", "中", "高"}
-	tagPool        = []string{"高价值", "数码爱好者", "夜猫子", "亲子", "教育", "高频登录", "商务", "忠诚用户", "学生", "价格敏感", "会员", "智能家居", "高净值", "高消费"}
+	genders       = []string{"男", "女"}
+	occupations   = []string{"程序员", "教师", "销售", "学生", "产品经理", "设计师", "医生", "律师", "自由职业", "公务员"}
+	educations    = []string{"高中", "大专", "本科", "硕士", "博士"}
+	maritalStatus = []string{"未婚", "已婚", "离异"}
+	incomeLevels  = []string{"<5k", "5k-10k", "10k-20k", "15k-20k", "20k-30k", "30k+"}
+	categories    = []string{"数码", "数码产品", "图书", "汽车", "美妆", "家电", "服饰", "食品", "母婴", "运动"}
+	deviceTypes   = []string{"iPhone", "Android", "iPad", "Windows", "Mac"}
+	osTypes       = []string{"iOS", "Android", "Windows", "macOS"}
+	browsers      = []string{"Safari", "Chrome", "Edge", "Firefox"}
+	appVersions   = []string{"8.0.0", "8.1.5", "8.2.0", "8.2.1", "9.0.0"}
+	riskLevels    = []string{"低", "中", "高"}
+	tagPool       = []string{"高价值", "数码爱好者", "夜猫子", "亲子", "教育", "高频登录", "商务", "忠诚用户", "学生", "价格敏感", "会员", "智能家居", "高净值", "高消费"}
 )
 
 // Generator produces deterministic synthetic users and rules from a seed.

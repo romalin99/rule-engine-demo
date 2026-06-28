@@ -100,6 +100,17 @@ func (p *parser) parseAnd() (Node, error) {
 }
 
 func (p *parser) parseUnary() (Node, error) {
+	// Prefix NOT: `NOT (expr)`, `NOT field = v`, `NOT NOT x`. It binds tighter
+	// than AND/OR but looser than a predicate, so it wraps whatever unary
+	// operand follows. `field NOT IN/LIKE` is handled inside parsePredicate.
+	if p.cur().Kind == tNot {
+		p.advance()
+		arg, err := p.parseUnary()
+		if err != nil {
+			return nil, err
+		}
+		return Not{Arg: arg}, nil
+	}
 	if p.cur().Kind == tLParen {
 		p.advance()
 		n, err := p.parseOr()
@@ -120,6 +131,16 @@ func (p *parser) parsePredicate() (Node, error) {
 		return nil, err
 	}
 	field := id.Text
+
+	// Optional NOT before IN / LIKE: `field NOT IN (...)`, `field NOT LIKE '...'`.
+	negate := false
+	if p.cur().Kind == tNot {
+		p.advance()
+		negate = true
+		if k := p.cur().Kind; k != tIn && k != tLike {
+			return nil, fmt.Errorf("expected IN or LIKE after NOT for field %q, got %q", field, p.cur().Text)
+		}
+	}
 
 	switch p.cur().Kind {
 	case tOp:
@@ -166,7 +187,7 @@ func (p *parser) parsePredicate() (Node, error) {
 		if _, err := p.expect(tRParen, "')' after IN list"); err != nil {
 			return nil, err
 		}
-		return In{Field: field, Vals: vals}, nil
+		return In{Field: field, Vals: vals, Negate: negate}, nil
 
 	case tLike:
 		p.advance()
@@ -174,7 +195,7 @@ func (p *parser) parsePredicate() (Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		return Like{Field: field, Pattern: s.Text}, nil
+		return Like{Field: field, Pattern: s.Text, Negate: negate}, nil
 
 	case tIs:
 		p.advance()

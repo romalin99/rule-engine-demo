@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/example/rule-engine-demo/pkg/constant"
+	"tcg-rulex-engine/pkg/constant"
 )
 
 // appendContextFields extracts user_id and trace_id from ctx.Value.

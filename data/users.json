@@ -70,5 +70,15 @@
     "device_type": "iPhone", "os_type": "iOS", "browser": "Safari", "app_version": "8.2.1",
     "active_score": 87.10, "credit_score": 740, "risk_level": "低",
     "tag1": "高消费", "tag2": "会员", "tag3": "高频登录"
+  },
+  {
+    "uid": 9, "username": "user009_full", "gender": "男", "age": 32, "province": "江苏", "city": "苏州",
+    "occupation": "工程师", "education": "硕士", "marital_status": "已婚", "income_level": "20k-30k",
+    "vip_level": 4, "register_days": 400, "login_days_30d": 26, "order_count": 60,
+    "total_amount": 22000.00, "avg_order_amount": 366.67, "favorite_category": "数码",
+    "device_type": "Android", "os_type": "Android", "browser": "Chrome", "app_version": "9.1.0",
+    "active_score": 90.50, "credit_score": 760, "risk_level": "低",
+    "last_login_time": "2026-06-26 21:15:00",
+    "tag1": "高价值", "tag2": "数码爱好者", "tag3": "全算子命中"
   }
 ]

@@ -1,19 +1,136 @@
-# binaries
-/rule-engine-demo
-/bin/
-*.exe
-*.out
-*.test
+# ==================== Rust / Cargo ====================
 
-# coverage / profiles
-*.prof
-coverage.txt
-coverage.html
+cmd/api/rulex
+# Build output
+target/
+# Cargo lock file
+# Binary project → keep Cargo.lock
+# Library project → ignore Cargo.lock
+# Cargo.lock
 
-# editor / OS
+# Cargo temp
+**/.cargo-ok
+
+# Cargo local registry cache (optional)
+.cargo/
+
+# ==================== Backup files ====================
+
+**/*.rs.bk
+*~
+*.swp
+*.swo
+*.swn
+# ==================== Environment ====================
+
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# ==================== Tools Ide ====================
+.git
+.ignore
+.gitignore
 .idea/
 .vscode/
-.DS_Store
+#.claude/
+.agents/
+.cursor/
+.codex/
+.env
 
-# generated data dumps (keep data/*.json samples)
-/tmp/
+# ==================== OS files ====================
+
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ==================== Logs ====================
+
+logs/
+*.log
+*.out
+
+# ==================== Build artifacts ====================
+
+dist/
+build/
+out/
+doc/
+pkg/
+.cppdemo
+*.tar.gz
+*.zip
+
+# ==================== Local config ====================
+
+config/local.toml
+config/*.local.toml
+
+# ==================== Cache & temp ====================
+
+.cache/
+tmp/
+temp/
+.bak/
+
+# Tool caches
+.just/
+.direnv/
+.atuin/
+
+# ==================== Docker ====================
+
+.docker/
+
+# ==================== Testing ====================
+
+# Coverage reports
+coverage/
+htmlcov/
+lcov.info
+
+# Raw profiling data (cargo-llvm-cov / grcov)
+*.profraw
+*.profdata
+
+# Mutation testing (cargo-mutants)
+**/mutants.out*/
+
+# Test result artifacts
+test-results/
+
+# ==================== Profiling & benchmarks ====================
+
+perf.data*
+*.perf
+criterion/
+flamegraph.svg
+bench-results/
+# ==================== Debug symbols ====================
+
+*.pdb
+*.dSYM
+
+# ==================== Generated files ====================
+
+# protobuf
+*.pb.rs
+
+# SQLx offline query cache
+.sqlx/
+
+# ==================== WASM ====================
+
+wasm-pack.log
+
+# ==================== Frontend (if applicable) ====================
+
+node_modules/
+
+# ==================== Database ORM ====================
+
+# Prisma
+.prisma/

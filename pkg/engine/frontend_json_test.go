@@ -1,10 +1,16 @@
+// frontend_json_test.go — JSON 前端与 CEL/Expr 前端占位断言。
+//
+// 运行 / Run:  go test ./pkg/engine/ -run 'JSON|Stub' -v
+// 用例 / Cases: TestJSONFrontend(and/between/in/like/>=)、TestJSONFrontendNegation
+//   (not_in/not_like/{"not":...}/<>)、TestStubFrontends(⚠ 见下方注解，当前会失败)。
+
 package engine_test
 
 import (
 	"testing"
 
-	"github.com/example/rule-engine-demo/pkg/engine"
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/engine"
+	"tcg-rulex-engine/pkg/model"
 )
 
 func TestJSONFrontend(t *testing.T) {
@@ -42,10 +48,57 @@ func TestJSONFrontend(t *testing.T) {
 	}
 }
 
+// TestStubFrontends ⚠ STALE / 可能已过时：本用例断言 CELFrontend / ExprFrontend.Parse
+// 返回「未实现」错误。但二者现已委托给真实实现 pkg/parser/cel、pkg/parser/expr
+// (cel-go / expr-lang)，Parse("age >= 18") 会成功返回 IR —— 因此本用例当前会失败。
+// 修复二选一：(a) 改为断言解析成功(下方注释给出范式)；(b) 删除本用例。
+//
+//	// (a) 期望成功的写法：
+//	for _, fe := range []engine.Frontend{engine.CELFrontend{}, engine.ExprFrontend{}} {
+//		if node, err := fe.Parse("age >= 18"); err != nil || node == nil {
+//			t.Errorf("%s: expected successful parse, got node=%v err=%v", fe.Name(), node, err)
+//		}
+//	}
 func TestStubFrontends(t *testing.T) {
 	for _, fe := range []engine.Frontend{engine.CELFrontend{}, engine.ExprFrontend{}} {
 		if _, err := fe.Parse("age >= 18"); err == nil {
 			t.Errorf("%s: expected not-implemented error", fe.Name())
 		}
+	}
+}
+
+// TestJSONFrontendNegation covers the JSON DSL's negation ops: not_in, not_like,
+// the {"not": ...} wrapper, and the "<>" alias.
+func TestJSONFrontendNegation(t *testing.T) {
+	jsonRule := `{
+      "and": [
+        {"field":"income_level","op":"not_in","values":["<5k","5k-10k"]},
+        {"field":"occupation","op":"not_like","value":"%学生%"},
+        {"not": {"field":"risk_level","op":"=","value":"高"}},
+        {"field":"marital_status","op":"<>","value":"未知"}
+      ]
+    }`
+
+	eng := engine.NewWithBackend(engine.NewBytecodeBackend(engine.JSONFrontend{}))
+	if loaded, failed := eng.LoadRules([]model.Rule{
+		{ID: 200, Name: "json-negation", Enabled: true, Expr: jsonRule},
+	}); loaded != 1 || failed != 0 {
+		t.Fatalf("loaded=%d failed=%d", loaded, failed)
+	}
+
+	hit := model.User{UID: 1, Fields: map[string]any{
+		"income_level": "20k-30k", "occupation": "工程师",
+		"risk_level": "低", "marital_status": "已婚",
+	}}
+	miss := model.User{UID: 2, Fields: map[string]any{
+		"income_level": "<5k", "occupation": "在校学生",
+		"risk_level": "高", "marital_status": "未知",
+	}}
+
+	if got := eng.Match(hit); len(got) != 1 || got[0] != 200 {
+		t.Errorf("hit: got %v want [200]", got)
+	}
+	if got := eng.Match(miss); len(got) != 0 {
+		t.Errorf("miss: got %v want []", got)
 	}
 }

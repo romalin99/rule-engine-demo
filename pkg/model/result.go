@@ -2,8 +2,8 @@ package model
 
 // MatchResult is a single (user, rule) hit.
 type MatchResult struct {
-	UID      int64 `json:"uid"`
-	RuleID   int64 `json:"rule_id"`
+	UID      int64  `json:"uid"`
+	RuleID   int64  `json:"rule_id"`
 	RuleName string `json:"rule_name"`
 }
 

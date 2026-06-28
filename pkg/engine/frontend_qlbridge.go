@@ -7,7 +7,7 @@ import (
 	"github.com/araddon/qlbridge/lex"
 	"github.com/araddon/qlbridge/value"
 
-	"github.com/example/rule-engine-demo/pkg/ir"
+	"tcg-rulex-engine/pkg/ir"
 )
 
 // QLBridgeFrontend uses qlbridge purely as a SQL parser: it parses rule text to

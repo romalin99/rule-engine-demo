@@ -48,14 +48,22 @@ func emitSQL(n Node) string {
 	case Between:
 		return t.Field + " BETWEEN " + sqlVal(t.Lo) + " AND " + sqlVal(t.Hi)
 	case In:
+		if t.Negate {
+			return t.Field + " NOT IN (" + sqlValList(t.Vals) + ")"
+		}
 		return t.Field + " IN (" + sqlValList(t.Vals) + ")"
 	case Like:
+		if t.Negate {
+			return t.Field + " NOT LIKE '" + t.Pattern + "'"
+		}
 		return t.Field + " LIKE '" + t.Pattern + "'"
 	case IsNull:
 		if t.Negate {
 			return t.Field + " IS NOT NULL"
 		}
 		return t.Field + " IS NULL"
+	case Not:
+		return "NOT (" + emitSQL(t.Arg) + ")"
 	}
 	return ""
 }
@@ -107,6 +115,8 @@ func emitCode(n Node, d DSL) string {
 		return emitLike(t, d)
 	case IsNull:
 		return emitIsNull(t, d)
+	case Not:
+		return "!(" + emitCode(t.Arg, d) + ")"
 	}
 	return ""
 }
@@ -150,23 +160,36 @@ func codeVal(v Value, d DSL) string {
 }
 
 func emitIn(t In, d DSL) string {
+	var pos string
 	switch d {
 	case CEL, Expr:
 		parts := make([]string, len(t.Vals))
 		for i, v := range t.Vals {
 			parts[i] = codeVal(v, d)
 		}
-		return t.Field + " in [" + strings.Join(parts, ", ") + "]"
+		pos = t.Field + " in [" + strings.Join(parts, ", ") + "]"
 	default: // Aviator: expand to OR of equals
 		parts := make([]string, len(t.Vals))
 		for i, v := range t.Vals {
 			parts[i] = t.Field + " == " + codeVal(v, d)
 		}
-		return "(" + strings.Join(parts, " || ") + ")"
+		pos = "(" + strings.Join(parts, " || ") + ")"
 	}
+	if t.Negate { // NOT IN -> logical-not of the membership test
+		return "!(" + pos + ")"
+	}
+	return pos
 }
 
 func emitLike(t Like, d DSL) string {
+	pos := emitLikePositive(t, d)
+	if t.Negate { // NOT LIKE -> logical-not of the match
+		return "!(" + pos + ")"
+	}
+	return pos
+}
+
+func emitLikePositive(t Like, d DSL) string {
 	kind, core := likeParts(t.Pattern)
 	q := quote(core, d)
 	switch d {

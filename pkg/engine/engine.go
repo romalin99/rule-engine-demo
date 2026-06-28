@@ -13,7 +13,7 @@ package engine
 import (
 	"fmt"
 
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/model"
 )
 
 // Matcher is the engine interface used by callers (HTTP server, batch jobs, ...).
@@ -77,7 +77,7 @@ func (e *Engine) compile(rules []model.Rule) (progs []*model.RuleProgram, failed
 			continue
 		}
 		progs = append(progs, &model.RuleProgram{
-			ID: r.ID, Name: r.Name, Priority: r.Priority, Source: r.Expr, AST: ast,
+			ID: r.ID, Name: r.Name, Priority: r.Priority, Version: r.Version, Source: r.Expr, AST: ast,
 		})
 	}
 	return progs, failed

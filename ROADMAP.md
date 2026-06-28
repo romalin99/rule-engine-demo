@@ -14,6 +14,10 @@ input, one IR, one bytecode VM, wide-table batch matching.
 - [x] Benchmarks (TPS / QPS / latency)
 - [x] `BETWEEN`, `IN`, `LIKE`, `AND`/`OR`
 - [x] `IS NULL` / `IS NOT NULL` (native frontend + VM)
+- [x] `<>` (= `!=`), `NOT IN`, `NOT LIKE`, `NOT (…)` group negation — native + JSON
+      front-ends, bytecode VM (`OpNot`), tree-walking runtime, and all 4 emit
+      targets (SQL/CEL/Expr/Aviator). Flagship full-coverage rule: `data/rules.json` #6
+      + `examples/allops`.
 
 ## Phase 2 — Unified parser front-ends 🔶
 
@@ -21,9 +25,12 @@ input, one IR, one bytecode VM, wide-table batch matching.
 - [x] Native SQL parser front-end (`ir` package)
 - [x] JSON Rule front-end
 - [x] All front-ends emit the **same IR**
-- [ ] Vitess SQL parser front-end
-- [ ] CEL front-end (`github.com/google/cel-go`) — stub in `frontend_stub.go`
-- [ ] Expr front-end (`github.com/expr-lang/expr`) — stub in `frontend_stub.go`
+- [x] CEL front-end (`pkg/parser/cel`, `github.com/google/cel-go`) — wired via `engine.CELFrontend`
+- [x] Expr front-end (`pkg/parser/expr`, `github.com/expr-lang/expr`) — wired via `engine.ExprFrontend`
+- [ ] Vitess SQL parser front-end — `pkg/parser/vitess` is a documented stub (needs `vitess.io/vitess` sqlparser)
+- [ ] qlbridge front-end negation mapping — `NOT IN` / `NOT LIKE` / `NOT (…)` are not yet
+      lowered from the qlbridge AST (its `UnaryNode` / negated binary). Until then, use
+      `-frontend native` (or JSON) for rules that need NOT; qlbridge marks them `failed`.
 
 ## Phase 3 — Self-built bytecode VM ✅ / 🔶
 
@@ -31,18 +38,21 @@ input, one IR, one bytecode VM, wide-table batch matching.
 - [x] Stack VM over `map[string]any` (zero-alloc, concurrency-safe)
 - [x] `Backend` abstraction: bytecode VM vs qlbridge VM (A/B benchmark)
 - [x] Throughput comparison: bytecode vs qlbridge (`internal/benchmark/compare_test.go`)
-- [ ] Comparison vs CEL / expr (needs those front-ends)
-- [ ] Short-circuit jumps (`JMP_IF_FALSE`/`JMP_IF_TRUE`)
-- [ ] Constant folding / predicate dedup across rules
+- [x] CEL / Expr runtimes (`pkg/runtime/cel`, `pkg/runtime/expr`) — enables bytecode-vs-cel/expr A/B
+- [x] Predicate dedup + logic flattening within a rule (`ir.Optimize`)
+- [ ] Short-circuit jumps (`JMP_IF_FALSE`/`JMP_IF_TRUE`) — deferred: rewrites the postfix VM core; not safe to land without a compile/test loop
+- [ ] Constant folding / predicate sharing **across** rules (rule index) — deferred: needs careful correctness work (OR / IS NULL)
 
 ## Productionization 🔶
 
 - [x] Hot-reload: incremental `AddRule`/`RemoveRule`, atomic `ReplaceRules`,
       file `Watcher` (`-serve -rules f -watch`)
 - [x] Decision Table input (`dtable`: rows → IR → SQL → rules)
-- [ ] `struct` and Apache Arrow record inputs (columnar batch eval)
-- [ ] Prometheus metrics, p50/p90/p99 latency
-- [ ] Rule index / predicate sharing to skip evaluating unrelated rules
+- [x] `struct` record input (`engine.UserFromStruct` / `UsersFromStructs`, reflection-free JSON mapping)
+- [x] Prometheus metrics (`/metrics`) + p50/p90/p99 online match latency
+- [x] Bounded concurrency: ≤200 users judged at once (`engine.MaxConcurrentUsers`, Phase 5)
+- [ ] Apache Arrow record input (columnar batch eval) — deferred: needs `apache/arrow` dependency
+- [ ] Rule index / predicate sharing to skip evaluating unrelated rules — deferred (see Phase 3)
 
 ## Scale
 

@@ -12,8 +12,8 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/example/rule-engine-demo/pkg/ir"
-	"github.com/example/rule-engine-demo/pkg/model"
+	"tcg-rulex-engine/pkg/ir"
+	"tcg-rulex-engine/pkg/model"
 )
 
 // Cond is a single cell: a predicate on one field.
