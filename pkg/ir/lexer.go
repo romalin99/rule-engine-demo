@@ -33,6 +33,14 @@ const (
 	tIs
 	tNot
 	tNull
+	tExists // EXISTS
+	tAny    // ANY / SOME
+	tAll    // ALL
+	tSelect // SELECT (sub-query projection)
+	tFrom   // FROM   (sub-query source collection)
+	tWhere  // WHERE  (sub-query predicate)
+	tStar   // *      (SELECT * in a sub-query)
+	tRegexp // REGEXP / RLIKE
 )
 
 // token is a single lexical token.
@@ -82,6 +90,9 @@ func (l *lexer) next() (token, error) {
 	case r == ',':
 		l.pos++
 		return token{Kind: tComma, Text: ",", Pos: start}, nil
+	case r == '*':
+		l.pos++
+		return token{Kind: tStar, Text: "*", Pos: start}, nil
 	case r == '\'' || r == '"':
 		return l.lexString(r)
 	case r == '=' || r == '!' || r == '>' || r == '<':
@@ -191,6 +202,20 @@ func (l *lexer) lexIdent() (token, error) {
 		return token{Kind: tNot, Text: text, Pos: start}, nil
 	case "NULL":
 		return token{Kind: tNull, Text: text, Pos: start}, nil
+	case "EXISTS":
+		return token{Kind: tExists, Text: text, Pos: start}, nil
+	case "ANY", "SOME":
+		return token{Kind: tAny, Text: text, Pos: start}, nil
+	case "ALL":
+		return token{Kind: tAll, Text: text, Pos: start}, nil
+	case "SELECT":
+		return token{Kind: tSelect, Text: text, Pos: start}, nil
+	case "FROM":
+		return token{Kind: tFrom, Text: text, Pos: start}, nil
+	case "WHERE":
+		return token{Kind: tWhere, Text: text, Pos: start}, nil
+	case "REGEXP", "RLIKE":
+		return token{Kind: tRegexp, Text: text, Pos: start}, nil
 	}
 	return token{Kind: tIdent, Text: text, Pos: start}, nil
 }

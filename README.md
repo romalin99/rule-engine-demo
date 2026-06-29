@@ -16,7 +16,11 @@ SQL / 表达式 / CEL / JSON，统一编译成字节码，由一个自研 VM 对
 | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
 | DSL 输入：SQL(qlbridge)、SQL(自研)、JSON Rule                                                                            | ✅                                  |
 | DSL 输入：CEL、Expr                                                                                                      | 🔶 扩展点已留（`frontend_stub.go`） |
-| 算子：`= <> != > >= < <=`、`BETWEEN`、`IN`/`NOT IN`、`LIKE`/`NOT LIKE`、`AND/OR`、`NOT (…)`、`IS [NOT] NULL`、括号优先级 | ✅ 原生/JSON 前端全覆盖             |
+| 算子：`= <> != > >= < <=`、`BETWEEN`、`IN`/`NOT IN`、`LIKE`/`NOT LIKE`、`REGEXP`/`NOT REGEXP`、`AND/OR`、`NOT (…)`、`IS [NOT] NULL`、括号优先级 | ✅ 原生/JSON 前端全覆盖             |
+| 函数：字符串 `LOWER/UPPER/TRIM/LENGTH/SUBSTRING`、数学 `ABS/ROUND/CEIL/FLOOR`、日期 `CURRENT_DATE/CURRENT_TIMESTAMP/YEAR/MONTH/DAY/DATEDIFF/DATE_ADD/DATE_SUB`、数组 `ARRAY_LENGTH/ARRAY_CONTAINS/ARRAY_OVERLAP` | ✅ 原生前端 + bytecode/ast（见 [docs/functions.md](docs/functions.md)） |
+| 集合判断：`EXISTS`、`ANY`/`ALL`（量词 + 行内子查询）；标量聚合子查询 `(SELECT COUNT/SUM/MIN/MAX/AVG(...) FROM 集合字段 WHERE …)` | ✅ 原生前端 + bytecode/ast          |
+| JSON 字段访问：`JSON_EXTRACT`/`JSON_VALUE`（`$.a.b[0]` 路径，字符串或已解析对象）                                        | ✅ 原生前端 + bytecode/ast          |
+| 正则匹配：`REGEXP`/`RLIKE`/`REGEXP_LIKE`（Go RE2，加载期预编译）                                                         | ✅ 原生前端 + bytecode/ast          |
 | 统一 IR（`ir` 包）                                                                                                       | ✅                                  |
 | 自研字节码 VM（`vm` 包，零分配、并发安全）                                                                               | ✅                                  |
 | 可插拔后端：自研 VM ↔ qlbridge VM（可对比吞吐）                                                                          | ✅                                  |
@@ -130,6 +134,21 @@ JSON Rule 示例（见 `data/rules_json.json`）：
 JSON DSL 也支持取反算子 `not_in` / `not_like` 与 `{"not": <node>}` 包裹，
 完整覆盖示例见 `data/rules_json_full.json`。
 
+进阶谓词同样接入了 JSON 前端（与原生 SQL 前端等价，详见 `pkg/parser/json` 包注释）：
+
+```json
+{ "and": [
+  { "field": "name", "op": "regexp", "value": "^A", "flags": "i" },
+  { "field": "profile", "json": "$.city", "op": "=", "value": "深圳" },
+  { "field": "score", "op": "<", "any": { "array": "scores" } },
+  { "exists": { "coll": "orders", "where": { "field": "amount", "op": ">", "value": 100 } } },
+  { "agg": { "fn": "SUM", "col": "amount", "from": "orders" }, "op": ">=", "value": 200 }
+] }
+```
+
+即:`regexp`/`not_regexp`、`json`(JSON_EXTRACT 路径修饰)、`any`/`all`(数组/值列表/子查询量词)、
+`exists`(非空或子查询)、`agg`(标量聚合子查询)。
+
 ---
 
 ## 🔁 多 DSL 互转
@@ -168,6 +187,55 @@ go run  cmd/api/main.go -rules data/rules.json -users data/users.json -frontend 
 > qlbridge 前端尚未映射取反 AST（`NOT IN`/`NOT LIKE`/`NOT(...)` 会被记为 `failed`，
 > 非致命）；需要取反的规则请用 `-frontend native`。详见
 > [ROADMAP.md](ROADMAP.md) 与 `pkg/parser/qlbridge` 包注释。
+
+---
+
+## 🧮 函数与表达式语法
+
+规则在基础算子之外,原生 SQL 前端还支持**字符串 / 数学 / 日期 / 数组**函数,可用于
+比较两侧以及 `BETWEEN`/`IN`/`LIKE`/`IS NULL` 的操作数。**完整参考与逐个用例见
+[docs/functions.md](docs/functions.md)。**
+
+| 类别   | 函数                                                              |
+| ------ | ----------------------------------------------------------------- |
+| 字符串 | `LOWER` `UPPER` `TRIM` `LENGTH` `SUBSTRING`/`SUBSTR`               |
+| 数学   | `ABS` `ROUND` `CEIL`/`CEILING` `FLOOR`                            |
+| 日期   | `CURRENT_DATE` `CURRENT_TIMESTAMP` `YEAR` `MONTH` `DAY` `DATEDIFF` `DATE_ADD` `DATE_SUB` |
+| 数组   | `ARRAY_LENGTH` `ARRAY_CONTAINS` `ARRAY_OVERLAP`                    |
+| 集合   | `EXISTS` `ANY`/`SOME` `ALL`（量词 + 行内子查询）；标量聚合 `COUNT/SUM/MIN/MAX/AVG` |
+| JSON   | `JSON_EXTRACT`/`JSON_VALUE`（`$.a.b[0]` 路径，取标量）             |
+| 正则   | `x REGEXP 'p'`/`RLIKE`、`REGEXP_LIKE(x,'p'[,'i'])`（RE2）          |
+
+```sql
+LOWER(name) = 'abc'                         -- 字符串
+ABS(delta) <= 5                             -- 数学
+LENGTH(nickname) BETWEEN 2 AND 12           -- 函数用作 BETWEEN 操作数
+UPPER(city_code) IN ('BJ','SH','GZ')        -- 函数用作 IN 操作数
+YEAR(birthday) = 2000                       -- 日期：提取年份
+DATEDIFF(CURRENT_DATE, last_login) <= 30    -- 日期：整天差
+DATE_SUB(CURRENT_DATE, 30) <= last_login    -- 日期：加减（近 30 天）
+ARRAY_CONTAINS(tags, '高价值')               -- 数组：包含
+ARRAY_LENGTH(tags) >= 2                     -- 数组：长度
+score = ANY(scores)                         -- 集合：量词（数组/列表）
+EXISTS(SELECT 1 FROM orders WHERE amount > 100)  -- 集合：行内子查询
+budget >= ALL(SELECT amount FROM orders WHERE status = '已付')
+(SELECT COUNT(*) FROM orders WHERE amount > 100) >= 2  -- 集合：标量聚合子查询
+budget > (SELECT SUM(amount) FROM orders)    -- 聚合作右操作数
+JSON_EXTRACT(profile, '$.city') = '深圳'     -- JSON：字段访问
+phone REGEXP '^139[0-9]{8}$'                -- 正则：RE2 匹配
+```
+
+要点（详见文档）：
+
+- 日期按 **ISO 字符串**处理（字典序＝时间序）；数组字段为 `[]string` / `[]any`，数组参数须为字段。
+- **两值逻辑**：任意一侧为 NULL 的比较判 `false`；`NOT (field = v)` 在 field 缺失时为 `true`
+  —— 要求字段存在请显式 `field IS NOT NULL`。
+- 暂不支持：算术运算符 `+ - * /`（日期加减改用 `DATE_ADD`/`DATE_SUB`）、`CASE WHEN`、跨表 JOIN / 外部数据源子查询；`LIKE` 仅 `%`（需完整模式用 `REGEXP`）；`ROUND` 仅单参。`EXISTS`/`ANY`/`ALL` 仅作用于**行内集合字段**；`JSON_EXTRACT` 仅取标量叶子；正则为 **RE2**（无反向引用/环视）。
+- 双运行时（`bytecode` / `ast`）语义一致，有交叉校验测试保证。
+
+**可运行示例**：`data/rules_functions.json` + `data/users_functions.json`
+（`go run ./cmd/api -rules data/rules_functions.json -users data/users_functions.json -frontend native`）。
+完整参考另有英文版 [docs/functions_en.md](docs/functions_en.md)。
 
 ---
 

@@ -64,6 +64,77 @@ func emitSQL(n Node) string {
 		return t.Field + " IS NULL"
 	case Not:
 		return "NOT (" + emitSQL(t.Arg) + ")"
+	case CompareTerm:
+		return emitTermSQL(t.Left) + " " + t.Op + " " + emitTermSQL(t.Right)
+	case LikeTerm:
+		if t.Negate {
+			return emitTermSQL(t.Left) + " NOT LIKE '" + t.Pattern + "'"
+		}
+		return emitTermSQL(t.Left) + " LIKE '" + t.Pattern + "'"
+	case IsNullTerm:
+		if t.Negate {
+			return emitTermSQL(t.Left) + " IS NOT NULL"
+		}
+		return emitTermSQL(t.Left) + " IS NULL"
+	case PredCall:
+		parts := make([]string, len(t.Args))
+		for i, a := range t.Args {
+			parts[i] = emitTermSQL(a)
+		}
+		return t.Fn + "(" + strings.Join(parts, ", ") + ")"
+	case Exists:
+		if t.Where != nil {
+			return "EXISTS (SELECT 1 FROM " + t.Coll + " WHERE " + emitSQL(t.Where) + ")"
+		}
+		return "EXISTS (" + t.Coll + ")"
+	case QuantArr:
+		return emitTermSQL(t.Left) + " " + t.Op + " " + quantKind(t.All) + " (" + emitTermSQL(t.Array) + ")"
+	case QuantSub:
+		sub := "SELECT " + t.Col + " FROM " + t.Coll
+		if t.Where != nil {
+			sub += " WHERE " + emitSQL(t.Where)
+		}
+		return emitTermSQL(t.Left) + " " + t.Op + " " + quantKind(t.All) + " (" + sub + ")"
+	case Regexp:
+		if t.Negate {
+			return emitTermSQL(t.Left) + " NOT REGEXP '" + t.Pattern + "'"
+		}
+		return emitTermSQL(t.Left) + " REGEXP '" + t.Pattern + "'"
+	}
+	return ""
+}
+
+// quantKind renders the ANY/ALL keyword for a quantifier node.
+func quantKind(all bool) string {
+	if all {
+		return "ALL"
+	}
+	return "ANY"
+}
+
+// emitTermSQL renders a scalar operand (field, literal, or function call) as SQL.
+func emitTermSQL(t Term) string {
+	switch x := t.(type) {
+	case FieldTerm:
+		return x.Name
+	case LitTerm:
+		return sqlVal(x.Val)
+	case CallTerm:
+		parts := make([]string, len(x.Args))
+		for i, a := range x.Args {
+			parts[i] = emitTermSQL(a)
+		}
+		return x.Fn + "(" + strings.Join(parts, ", ") + ")"
+	case AggSub:
+		arg := x.Col
+		if arg == "" {
+			arg = "*"
+		}
+		sub := "SELECT " + x.Fn + "(" + arg + ") FROM " + x.Coll
+		if x.Where != nil {
+			sub += " WHERE " + emitSQL(x.Where)
+		}
+		return "(" + sub + ")"
 	}
 	return ""
 }

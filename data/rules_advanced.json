@@ -1,0 +1,24 @@
+[
+  { "id": 9101, "name": "正则-REGEXP", "enabled": true, "comment": "REGEXP 中缀,RE2 语法。uid 1 命中。", "expr": "phone REGEXP '^139[0-9]{8}$'" },
+  { "id": 9102, "name": "正则-NOT-REGEXP", "enabled": true, "comment": "NOT REGEXP:name 不以数字开头。", "expr": "name NOT REGEXP '^[0-9]'" },
+  { "id": 9103, "name": "正则-REGEXP_LIKE-i", "enabled": true, "comment": "REGEXP_LIKE 函数形式,'i' 大小写不敏感。", "expr": "REGEXP_LIKE(name, 'alice', 'i')" },
+
+  { "id": 9111, "name": "JSON-城市", "enabled": true, "comment": "JSON_EXTRACT 从 JSON 字符串取标量。", "expr": "JSON_EXTRACT(profile, '$.city') = '深圳'" },
+  { "id": 9112, "name": "JSON-年龄", "enabled": true, "comment": "JSON 数字叶子,可数值比较。", "expr": "JSON_EXTRACT(profile, '$.age') >= 18" },
+  { "id": 9113, "name": "JSON-嵌套路径", "enabled": true, "comment": "JSON 多层路径 $.addr.zip。", "expr": "JSON_EXTRACT(profile, '$.addr.zip') = '518000'" },
+  { "id": 9114, "name": "JSON-布尔", "enabled": true, "comment": "JSON 布尔渲染为 'true'/'false'。", "expr": "JSON_EXTRACT(profile, '$.vip') = 'true'" },
+  { "id": 9115, "name": "JSON+量词", "enabled": true, "comment": "JSON 值作为 ANY 左操作数,对数组求量词。", "expr": "JSON_EXTRACT(profile, '$.age') < ANY(scores)" },
+
+  { "id": 9121, "name": "数组-OVERLAP", "enabled": true, "comment": "数组与值列表是否有交集。", "expr": "ARRAY_OVERLAP(tags, 'gold', 'silver')" },
+  { "id": 9122, "name": "数组-CONTAINS", "enabled": true, "comment": "数组包含某元素。", "expr": "ARRAY_CONTAINS(tags, '高价值')" },
+
+  { "id": 9131, "name": "集合-EXISTS-子查询", "enabled": true, "comment": "嵌套对象数组的 EXISTS 子查询。", "expr": "EXISTS(SELECT 1 FROM orders WHERE amount > 100)" },
+  { "id": 9132, "name": "集合-ALL-子查询", "enabled": true, "comment": "ALL 子查询:预算覆盖所有已付订单。", "expr": "budget >= ALL(SELECT amount FROM orders WHERE status = 'paid')" },
+
+  { "id": 9141, "name": "聚合-COUNT", "enabled": true, "comment": "标量聚合子查询:已付订单数 >= 2。", "expr": "(SELECT COUNT(*) FROM orders WHERE status = 'paid') >= 2" },
+  { "id": 9142, "name": "聚合-SUM", "enabled": true, "comment": "订单总额 >= 200。", "expr": "(SELECT SUM(amount) FROM orders) >= 200" },
+  { "id": 9143, "name": "聚合-AVG", "enabled": true, "comment": "已付订单均价 >= 90。", "expr": "(SELECT AVG(amount) FROM orders WHERE status = 'paid') >= 90" },
+  { "id": 9144, "name": "聚合-MAX", "enabled": true, "comment": "最大订单额 = 120。", "expr": "(SELECT MAX(amount) FROM orders) = 120" },
+  { "id": 9145, "name": "聚合-MIN", "enabled": true, "comment": "最小件数 = 1。", "expr": "(SELECT MIN(qty) FROM orders) = 1" },
+  { "id": 9146, "name": "聚合-右操作数", "enabled": true, "comment": "聚合子查询作右操作数:预算 > 订单总额。", "expr": "budget > (SELECT SUM(amount) FROM orders)" }
+]

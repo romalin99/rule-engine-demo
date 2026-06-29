@@ -1,0 +1,28 @@
+[
+  {
+    "uid": 1,
+    "username": "demo-advanced-hit",
+    "name": "Alice123",
+    "phone": "13912345678",
+    "budget": 500,
+    "profile": "{\"city\":\"深圳\",\"age\":30,\"vip\":true,\"addr\":{\"zip\":\"518000\"}}",
+    "tags": ["vip", "gold", "高价值"],
+    "scores": [70, 85, 92],
+    "orders": [
+      { "amount": 120, "status": "paid", "qty": 2 },
+      { "amount": 80, "status": "paid", "qty": 1 },
+      { "amount": 50, "status": "refunded", "qty": 3 }
+    ]
+  },
+  {
+    "uid": 2,
+    "username": "demo-advanced-partial",
+    "name": "bob",
+    "phone": "0000",
+    "budget": 10,
+    "profile": "{\"city\":\"北京\"}",
+    "tags": ["basic"],
+    "scores": [10],
+    "orders": []
+  }
+]

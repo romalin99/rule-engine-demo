@@ -10,22 +10,25 @@ const (
 	kNum
 	kStr
 	kBool
+	kArr // array of strings (backs the ARRAY_* functions)
 )
 
 // Value is a tagged union held on the VM stack. Using a flat struct (no
 // interfaces) keeps evaluation allocation-free and avoids reflection.
 type Value struct {
-	s string
-	n float64
-	k vkind
-	b bool
+	s   string
+	arr []string
+	n   float64
+	k   vkind
+	b   bool
 }
 
 var undef = Value{k: kUndef}
 
-func numV(f float64) Value { return Value{k: kNum, n: f} }
-func strV(s string) Value  { return Value{k: kStr, s: s} }
-func boolV(b bool) Value   { return Value{k: kBool, b: b} }
+func numV(f float64) Value  { return Value{k: kNum, n: f} }
+func strV(s string) Value   { return Value{k: kStr, s: s} }
+func boolV(b bool) Value    { return Value{k: kBool, b: b} }
+func arrV(a []string) Value { return Value{k: kArr, arr: a} }
 
 // toValue converts a raw field value (from map[string]any) into a VM Value.
 // JSON numbers arrive as float64; the generator uses int/float64 natively.
@@ -61,6 +64,14 @@ func toValue(raw any) Value {
 		return numV(float64(x))
 	case float64:
 		return numV(x)
+	case []string:
+		return arrV(x)
+	case []any:
+		out := make([]string, len(x))
+		for i, e := range x {
+			out[i] = toValue(e).asString()
+		}
+		return arrV(out)
 	default:
 		return undef
 	}
