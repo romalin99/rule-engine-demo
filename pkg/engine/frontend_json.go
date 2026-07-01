@@ -112,6 +112,16 @@ func (n jsonNode) leaf() (ir.Node, error) {
 		if err != nil {
 			return nil, err
 		}
+		// String/date bounds desugar to `field >= lo AND field <= hi` (lexical
+		// order), mirroring the native SQL parser so a JSON rule compiles to the
+		// very same bytecode as its SQL equivalent. The compact Between node is
+		// numeric-only.
+		if lo.IsString || hi.IsString {
+			return ir.Logic{Op: "AND", Args: []ir.Node{
+				ir.Compare{Field: n.Field, Op: ">=", Val: lo},
+				ir.Compare{Field: n.Field, Op: "<=", Val: hi},
+			}}, nil
+		}
 		return ir.Between{Field: n.Field, Lo: lo, Hi: hi}, nil
 	case "in", "not_in", "notin":
 		vals := make([]ir.Value, 0, len(n.Values))

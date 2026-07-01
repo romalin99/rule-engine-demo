@@ -36,6 +36,11 @@ type compiler struct {
 	fieldIdx map[string]int32
 }
 
+// substrToEnd is the sentinel length used to lower the 2-argument SUBSTRING(s,
+// start) into the 3-argument opcode: it is larger than any realistic string, so
+// substr clamps the slice to the remaining runes ("from start to the end").
+const substrToEnd = float64(1 << 30)
+
 func (c *compiler) add(op OpCode, a int32) {
 	c.p.Code = append(c.p.Code, Instr{Op: op, A: a})
 }
@@ -350,7 +355,7 @@ func (c *compiler) emitJSON(x ir.CallTerm) error {
 	return nil
 }
 
-// emitPred lowers a boolean-valued function call (currently ARRAY_CONTAINS).
+// emitPred lowers a boolean-valued function call (ARRAY_CONTAINS / ARRAY_INTERSECT).
 func (c *compiler) emitPred(t ir.PredCall) error {
 	switch t.Fn {
 	case "ARRAY_CONTAINS":
@@ -364,6 +369,20 @@ func (c *compiler) emitPred(t ir.PredCall) error {
 			return err
 		}
 		c.add(OpArrContains, 0)
+		return nil
+	case "ARRAY_INTERSECT":
+		// ARRAY_INTERSECT(a, b): true when two array fields share at least one
+		// element (set intersection is non-empty). Both operands are arrays.
+		if len(t.Args) != 2 {
+			return fmt.Errorf("vm: ARRAY_INTERSECT expects 2 arguments, got %d", len(t.Args))
+		}
+		if err := c.emitTerm(t.Args[0]); err != nil {
+			return err
+		}
+		if err := c.emitTerm(t.Args[1]); err != nil {
+			return err
+		}
+		c.add(OpArrIntersect, 0)
 		return nil
 	default:
 		return fmt.Errorf("vm: unsupported predicate function %q", t.Fn)
@@ -386,6 +405,20 @@ func (c *compiler) emitTerm(t ir.Term) error {
 		// lowered specially rather than through the generic value-stack path.
 		if x.Fn == "JSON_EXTRACT" || x.Fn == "JSON_VALUE" {
 			return c.emitJSON(x)
+		}
+		// SUBSTRING(s, start) (2-arg) means "from start to the end of the string".
+		// Lower it to the 3-arg opcode with a sentinel length that substr clamps
+		// to the remaining runes, so no dedicated 2-arg opcode is needed.
+		if (x.Fn == "SUBSTRING" || x.Fn == "SUBSTR") && len(x.Args) == 2 {
+			if err := c.emitTerm(x.Args[0]); err != nil {
+				return err
+			}
+			if err := c.emitTerm(x.Args[1]); err != nil {
+				return err
+			}
+			c.add(OpConstNum, c.numConst(substrToEnd))
+			c.add(OpSubstr, 0)
+			return nil
 		}
 		for _, a := range x.Args {
 			if err := c.emitTerm(a); err != nil {
@@ -424,6 +457,14 @@ func fnOp(fn string, argc int) (OpCode, error) {
 			return OpDateSub3, nil
 		}
 		return 0, fmt.Errorf("vm: DATE_SUB expects 2 or 3 arguments, got %d", argc)
+	case "ROUND":
+		switch argc {
+		case 1:
+			return OpRound, nil // ROUND(x) -> nearest integer
+		case 2:
+			return OpRound2, nil // ROUND(x, d) -> round to d decimal places
+		}
+		return 0, fmt.Errorf("vm: ROUND expects 1 or 2 arguments, got %d", argc)
 	}
 	op, want, ok := lookupFn(fn)
 	if !ok {
@@ -448,8 +489,6 @@ func lookupFn(fn string) (op OpCode, argc int, ok bool) {
 		return OpLength, 1, true
 	case "ABS":
 		return OpAbs, 1, true
-	case "ROUND":
-		return OpRound, 1, true
 	case "CEIL", "CEILING":
 		return OpCeil, 1, true
 	case "FLOOR":

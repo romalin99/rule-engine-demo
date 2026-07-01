@@ -104,6 +104,7 @@ ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。�
 | `TRIM(x)` | 字符串 | 去除首尾空白 |
 | `LENGTH(x)` | 数字 | **字符数(rune)**,中文安全 |
 | `SUBSTRING(s, start, len)` / `SUBSTR` | 字符串 | **从 1 开始**、按 rune 截取;越界截断为 `''` |
+| `SUBSTRING(s, start)` / `SUBSTR` | 字符串 | 两参形式:从 `start`(1 起)截到**字符串末尾** |
 
 ```
 规则: LOWER(name) = 'abc'              数据: {"name":"ABC"}          → 命中
@@ -111,6 +112,7 @@ ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。�
 规则: TRIM(city) = '北京'              数据: {"city":"  北京  "}     → 命中
 规则: LENGTH(name) = 3                 数据: {"name":"数码城"}        → 命中  (3 个字符)
 规则: SUBSTRING(phone, 1, 3) = '139'   数据: {"phone":"13912345678"} → 命中
+规则: SUBSTRING(phone, 8) = '5678'     数据: {"phone":"13912345678"} → 命中  (第 8 位到末尾)
 ```
 
 ### 5.2 数学函数 (Math)
@@ -118,7 +120,8 @@ ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。�
 | 函数 | 返回 | 说明 |
 | ---- | ---- | ---- |
 | `ABS(x)` | 数字 | 绝对值 |
-| `ROUND(x)` | 数字 | 就近取整(四舍五入,远离零方向);仅单参 |
+| `ROUND(x)` | 数字 | 就近取整(四舍五入,远离零方向) |
+| `ROUND(x, d)` | 数字 | 保留 `d` 位小数(`d` 可为负,按十/百位取整);四舍五入、远离零 |
 | `CEIL(x)` / `CEILING(x)` | 数字 | 向上取整 |
 | `FLOOR(x)` | 数字 | 向下取整 |
 
@@ -127,6 +130,7 @@ ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。�
 ```
 规则: ABS(delta) <= 5      数据: {"delta":-3}     → 命中
 规则: ROUND(score) = 86    数据: {"score":85.6}   → 命中
+规则: ROUND(price, 2) = 3.14   数据: {"price":3.14159} → 命中  (保留 2 位小数)
 规则: CEIL(score) = 86     数据: {"score":85.1}   → 命中
 规则: FLOOR(score) = 85    数据: {"score":85.9}   → 命中
 ```
@@ -138,8 +142,8 @@ ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。�
 
 | 函数 | 返回 | 说明 |
 | ---- | ---- | ---- |
-| `CURRENT_DATE` | 字符串 `YYYY-MM-DD` | **裸关键字,无括号**,取当天 |
-| `CURRENT_TIMESTAMP` | 字符串 `YYYY-MM-DD HH:MM:SS` | 裸关键字,取当前时刻 |
+| `CURRENT_DATE` | 字符串 `YYYY-MM-DD` | **裸关键字,无括号**,取当天;可用于比较**任意一侧**(如 `CURRENT_DATE >= last_login`) |
+| `CURRENT_TIMESTAMP` | 字符串 `YYYY-MM-DD HH:MM:SS` | 裸关键字,取当前时刻;可用于比较任意一侧 |
 | `YEAR(x)` / `MONTH(x)` / `DAY(x)` | 数字 | 从日期字符串提取年/月/日 |
 | `DATEDIFF(a, b)` | 数字 | 整天数 `a − b`(截断) |
 | `DATE_ADD(d, n [, unit])` | 字符串 | 日期**加** n 个单位(省略 unit 时按 **DAY**);保留输入精度(日期 / 日期时间) |
@@ -151,6 +155,8 @@ ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。�
 
 ```
 规则: register_date <= CURRENT_DATE             数据: {"register_date":"2020-01-01"} → 命中
+规则: CURRENT_DATE >= register_date             数据: {"register_date":"2020-01-01"} → 命中  (裸关键字作左操作数)
+规则: register_date BETWEEN '2020-01-01' AND '2020-12-31'  数据: {"register_date":"2020-06-15"} → 命中  (日期区间)
 规则: YEAR(birthday) = 2000                     数据: {"birthday":"2000-06-15"}      → 命中
 规则: MONTH(birthday) = 6                        数据: {"birthday":"2000-06-15"}      → 命中
 规则: DAY(birthday) = 15                          数据: {"birthday":"2000-06-15 08:30:00"} → 命中
@@ -170,7 +176,8 @@ ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。�
 | ---- | ---- | ---- |
 | `ARRAY_LENGTH(field)` | 数字 | 元素个数 |
 | `ARRAY_CONTAINS(field, v)` | 布尔 | `v`(字符串或数字)是否为元素 |
-| `ARRAY_OVERLAP(field, v1, v2, …)` | 布尔 | 是否含任一 `vi`(脱糖为 `ARRAY_CONTAINS` 的 `OR`) |
+| `ARRAY_OVERLAP(field, v1, v2, …)` | 布尔 | 是否含任一**字面量** `vi`(脱糖为 `ARRAY_CONTAINS` 的 `OR`) |
+| `ARRAY_INTERSECT(fieldA, fieldB)` | 布尔 | 两个**数组字段**是否有交集(交集非空);元素按文本比较,空/缺失一侧为 `false` |
 
 > `ARRAY_CONTAINS` / `ARRAY_OVERLAP` 本身就是完整布尔谓词;`ARRAY_LENGTH` 返回数字,
 > 用于比较式中。
@@ -180,7 +187,10 @@ ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。�
 规则: ARRAY_CONTAINS(tags, 'vip')          数据: {"tags":["vip","new"]}        → 命中
 规则: ARRAY_CONTAINS(ids, 5)               数据: {"ids":[1,5,9]}               → 命中  (按文本 "5")
 规则: ARRAY_OVERLAP(tags, 'gold', 'vip')   数据: {"tags":["vip"]}              → 命中
+规则: ARRAY_INTERSECT(tags, targets)       数据: {"tags":["vip","new"],"targets":["gold","new"]} → 命中  (共有 "new")
 ```
+
+> `ARRAY_OVERLAP` 的比较值是**字面量列表**;若要判断两个**数组字段**的交集(如用户标签 ∩ 活动目标标签),用 `ARRAY_INTERSECT(a, b)`。
 
 ### 5.5 集合判断:EXISTS / ANY / ALL (Set predicates)
 
@@ -394,7 +404,6 @@ curl -s localhost:8080/rules/test -H 'Content-Type: application/json' \
 - `LIKE` 仅支持 `%`;单字符通配 `_` 按普通字符处理。需要完整模式时用 `REGEXP`。
 - 正则为 **RE2**:不支持反向引用 `\1`、环视 `(?=...)` 等 PCRE 特性。
 - `JSON_EXTRACT` 仅返回**标量叶子**(对象/数组 → NULL);路径须为字符串字面量。
-- `ROUND(x, d)` 双参未实现,仅 `ROUND(x)` 取整。
 - 完整 `SELECT … FROM … WHERE …;` 外壳——只传谓词表达式本身(行内子查询除外,见 §5.5)。
 - 上述函数与集合谓词目前仅由**原生 SQL 解析器**解析,并只发射 **SQL**(供 `Optimize`
   去重使用);把它们翻译成 CEL / Expr / Aviator 尚未实现。

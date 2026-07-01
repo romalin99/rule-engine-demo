@@ -15,18 +15,36 @@ import (
 // NOT participate in evaluation — the bytecode VM does.
 //
 //	Rule(SQL) ─qlbridge.ParseExpression─▶ AST(Node) ─convert─▶ ir.Node
+//
+// qlbridge only understands the basic predicate subset (AND/OR, comparisons,
+// IN, LIKE, numeric BETWEEN). For the richer SQL surface the engine advertises —
+// scalar functions (LOWER/ROUND/DATE_*/…), IS [NOT] NULL, NOT (…), EXISTS/ANY/
+// ALL, REGEXP, JSON_EXTRACT, array predicates — this frontend transparently
+// falls back to the native parser (package ir), which is a strict superset.
+// This keeps the default engine (engine.New) able to parse every documented
+// feature while still exercising qlbridge for the common fast path.
 type QLBridgeFrontend struct{}
 
 // Name identifies the frontend.
 func (QLBridgeFrontend) Name() string { return "qlbridge" }
 
-// Parse parses with qlbridge then converts the AST to IR.
+// Parse parses with qlbridge then converts the AST to IR, falling back to the
+// native parser for anything qlbridge cannot parse or convert.
 func (QLBridgeFrontend) Parse(rule string) (ir.Node, error) {
 	node, err := expr.ParseExpression(rule)
 	if err != nil {
-		return nil, fmt.Errorf("qlbridge parse: %w", err)
+		// qlbridge cannot lex/parse this construct (functions it rejects, IS NULL,
+		// EXISTS, REGEXP, JSON accessors, …). Defer to the native SQL parser.
+		return ir.Parse(rule)
 	}
-	return qlToIR(node)
+	irNode, err := qlToIR(node)
+	if err != nil {
+		// qlbridge parsed it, but into a shape the converter does not support
+		// (e.g. a function call, NOT, a quantifier). Defer to the native parser,
+		// which produces the same IR the VM evaluates.
+		return ir.Parse(rule)
+	}
+	return irNode, nil
 }
 
 // qlToIR converts a qlbridge AST node into the project IR.
@@ -123,6 +141,15 @@ func qlToIR(n expr.Node) (ir.Node, error) {
 		hi, err := litVal(t.Args[2])
 		if err != nil {
 			return nil, err
+		}
+		// String/date bounds desugar to `field >= lo AND field <= hi` (lexical
+		// order), mirroring the native parser; the compact Between node is
+		// numeric-only. Keeps both frontends consistent for date-range BETWEEN.
+		if lo.IsString || hi.IsString {
+			return ir.Logic{Op: "AND", Args: []ir.Node{
+				ir.Compare{Field: field, Op: ">=", Val: lo},
+				ir.Compare{Field: field, Op: "<=", Val: hi},
+			}}, nil
 		}
 		return ir.Between{Field: field, Lo: lo, Hi: hi}, nil
 	}

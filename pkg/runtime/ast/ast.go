@@ -607,6 +607,18 @@ func applyFunc(fn string, args []ir.Term, row map[string]any) any {
 			return math.Abs(f)
 		}
 	case "ROUND":
+		// ROUND(x, d) rounds to d decimal places; ROUND(x) to the nearest integer.
+		if len(vals) == 2 {
+			x, xok := vals[0].(float64)
+			d, dok := vals[1].(float64)
+			if xok && dok {
+				pow := math.Pow(10, d)
+				if pow != 0 && !math.IsInf(pow, 0) {
+					return math.Round(x*pow) / pow
+				}
+			}
+			return nil
+		}
 		if f, ok := numOperand(vals); ok {
 			return math.Round(f)
 		}
@@ -751,22 +763,33 @@ func numOperand(vals []any) (float64, bool) {
 	return f, ok
 }
 
-// substrAST mirrors the VM's substr: SQL SUBSTRING(s, start, length), 1-indexed
-// and rune-based, with out-of-range start/length clamped to the empty string.
+// substrAST mirrors the VM's substr: SQL SUBSTRING(s, start[, length]),
+// 1-indexed and rune-based, with out-of-range start/length clamped to the empty
+// string. The 2-argument form returns the suffix from start to the end of the
+// string (matching the bytecode VM, which lowers it with a to-the-end length).
 func substrAST(vals []any) any {
-	if len(vals) != 3 || vals[0] == nil {
+	if len(vals) != 2 && len(vals) != 3 {
+		return nil
+	}
+	if vals[0] == nil {
 		return nil
 	}
 	start, sok := vals[1].(float64)
-	length, lok := vals[2].(float64)
-	if !sok || !lok {
+	if !sok {
 		return nil
 	}
 	rs := []rune(valStr(vals[0]))
 	from := int(start) - 1
-	count := int(length)
 	if from < 0 {
 		from = 0
+	}
+	count := len(rs) // 2-arg SUBSTRING(s, start): to the end of the string
+	if len(vals) == 3 {
+		length, lok := vals[2].(float64)
+		if !lok {
+			return nil
+		}
+		count = int(length)
 	}
 	if from >= len(rs) || count <= 0 {
 		return ""
@@ -854,8 +877,9 @@ func parseDateAST(s string) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// evalPred evaluates a boolean-valued array predicate (ARRAY_CONTAINS), mirroring
-// the bytecode VM. The array operand must be a field reference.
+// evalPred evaluates a boolean-valued array predicate (ARRAY_CONTAINS /
+// ARRAY_INTERSECT), mirroring the bytecode VM. Array operands must be field
+// references.
 func evalPred(fn string, args []ir.Term, row map[string]any) bool {
 	if len(args) < 1 {
 		return false
@@ -866,6 +890,9 @@ func evalPred(fn string, args []ir.Term, row map[string]any) bool {
 	}
 	if fn == "ARRAY_CONTAINS" && len(args) == 2 {
 		return sliceContains(arr, valStr(evalTerm(args[1], row)))
+	}
+	if fn == "ARRAY_INTERSECT" && len(args) == 2 {
+		return sliceIntersect(arr, arrayOf(args[1], row))
 	}
 	return false
 }
@@ -899,6 +926,25 @@ func toStringSlice(raw any) []string {
 func sliceContains(arr []string, v string) bool {
 	for _, e := range arr {
 		if e == v {
+			return true
+		}
+	}
+	return false
+}
+
+// sliceIntersect reports whether two string slices share at least one element
+// (non-empty set intersection). An empty operand yields false, mirroring the
+// bytecode VM's arrIntersect.
+func sliceIntersect(a, b []string) bool {
+	if len(a) == 0 || len(b) == 0 {
+		return false
+	}
+	set := make(map[string]struct{}, len(a))
+	for _, e := range a {
+		set[e] = struct{}{}
+	}
+	for _, e := range b {
+		if _, ok := set[e]; ok {
 			return true
 		}
 	}

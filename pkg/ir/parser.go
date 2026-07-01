@@ -170,11 +170,24 @@ func (p *parser) parsePredicate() (Node, error) {
 				return PredCall(call), nil
 			case "ARRAY_OVERLAP":
 				return overlapToOr(call.Args)
+			case "ARRAY_INTERSECT":
+				return PredCall(call), nil
 			case "REGEXP_LIKE":
 				return regexpLikeToNode(call.Args)
 			}
 		}
 		return p.parseTermPredicate(left)
+	}
+
+	// CURRENT_DATE / CURRENT_TIMESTAMP are nullary date functions written without
+	// parentheses. As the LEFT operand of a predicate they must resolve to the
+	// function value (today / now), not a field literally named "CURRENT_DATE";
+	// route them through the term-based predicate tail so that
+	// `CURRENT_DATE >= last_login`, `CURRENT_TIMESTAMP < x`, etc. evaluate the
+	// function. This mirrors parseTerm's handling of the same keywords on the
+	// right-hand side.
+	if u := upper(field); u == "CURRENT_DATE" || u == "CURRENT_TIMESTAMP" {
+		return p.parseTermPredicate(CallTerm{Fn: u})
 	}
 
 	// Optional NOT before IN / LIKE / REGEXP: `field NOT IN (...)`,
@@ -219,6 +232,19 @@ func (p *parser) parsePredicate() (Node, error) {
 		hi, err := p.parseValue()
 		if err != nil {
 			return nil, err
+		}
+		// Numeric bounds keep the compact numeric-range Between node. String bounds
+		// (e.g. date ranges like `register_date BETWEEN '2020-01-01' AND
+		// '2020-12-31'`) desugar into `field >= lo AND field <= hi`; both runtimes
+		// evaluate string comparisons with lexical ordering, which equals
+		// chronological order for ISO date strings. This also keeps the two
+		// runtimes consistent (the numeric-only Between path used to fail to
+		// compile on the bytecode VM and silently return false on the AST runtime).
+		if lo.IsString || hi.IsString {
+			return Logic{Op: "AND", Args: []Node{
+				Compare{Field: field, Op: ">=", Val: lo},
+				Compare{Field: field, Op: "<=", Val: hi},
+			}}, nil
 		}
 		return Between{Field: field, Lo: lo, Hi: hi}, nil
 

@@ -85,6 +85,20 @@ func (p *Program) Eval(row map[string]any) bool {
 			st[sp-2] = boolV(arrContains(st[sp-2], st[sp-1]))
 			sp--
 
+		case OpArrIntersect: // pop arr1,arr2 -> bool (non-empty intersection)
+			if sp < 2 {
+				return false
+			}
+			st[sp-2] = boolV(arrIntersect(st[sp-2], st[sp-1]))
+			sp--
+
+		case OpRound2: // pop x,d -> round x to d decimal places
+			if sp < 2 {
+				return false
+			}
+			st[sp-2] = round2(st[sp-2], st[sp-1])
+			sp--
+
 		case OpDateAdd2, OpDateSub2: // pop n,date -> date shifted by whole days
 			if sp < 2 {
 				return false
@@ -388,6 +402,41 @@ func arrContains(arr, v Value) bool {
 		}
 	}
 	return false
+}
+
+// arrIntersect reports whether two array values share at least one element
+// (their set intersection is non-empty). Elements are compared as text, so it
+// works across []string / []any fields. A non-array or empty operand yields
+// false (nothing to intersect).
+func arrIntersect(a, b Value) bool {
+	if a.k != kArr || b.k != kArr || len(a.arr) == 0 || len(b.arr) == 0 {
+		return false
+	}
+	set := make(map[string]struct{}, len(a.arr))
+	for _, e := range a.arr {
+		set[e] = struct{}{}
+	}
+	for _, e := range b.arr {
+		if _, ok := set[e]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// round2 implements ROUND(x, d): round x to d decimal places (d may be negative
+// to round to tens/hundreds). Both operands must be numeric; a NULL or
+// non-numeric operand yields undef. Rounding is half-away-from-zero (math.Round),
+// matching single-argument ROUND.
+func round2(x, d Value) Value {
+	if x.k != kNum || d.k != kNum {
+		return undef
+	}
+	pow := math.Pow(10, d.n)
+	if pow == 0 || math.IsInf(pow, 0) {
+		return undef
+	}
+	return numV(math.Round(x.n*pow) / pow)
 }
 
 // parseDateFull parses a date/datetime string and reports whether the matched

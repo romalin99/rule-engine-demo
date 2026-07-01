@@ -99,6 +99,12 @@ func (l *lexer) next() (token, error) {
 		return l.lexOp()
 	case unicode.IsDigit(r):
 		return l.lexNumber()
+	case r == '-' && (unicode.IsDigit(l.peekNext()) || l.peekNext() == '.'):
+		// A '-' immediately followed by a digit / '.' is a negative number
+		// literal (e.g. `temperature < -10`, `DATE_ADD(d, -7)`, `ROUND(x, -1)`).
+		// This grammar has no binary subtraction operator, so a leading '-' is
+		// unambiguously a sign and never a subtraction.
+		return l.lexNumber()
 	case isIdentStart(r):
 		return l.lexIdent()
 	default:
@@ -168,6 +174,9 @@ func (l *lexer) lexOp() (token, error) {
 
 func (l *lexer) lexNumber() (token, error) {
 	start := l.pos
+	if l.src[l.pos] == '-' { // optional leading sign (negative literal)
+		l.pos++
+	}
 	for l.pos < len(l.src) {
 		c := l.src[l.pos]
 		if unicode.IsDigit(c) || c == '.' {

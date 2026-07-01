@@ -149,6 +149,54 @@ func TestMatcherInterface(t *testing.T) {
 	}
 }
 
+// advancedRules use SQL surface qlbridge cannot parse/convert on its own
+// (functions, IS NULL, NOT, REGEXP, JSON_EXTRACT, array predicates, date
+// functions). They must compile and match identically under both frontends,
+// proving the qlbridge frontend transparently falls back to the native parser.
+func advancedRules() []model.Rule {
+	return []model.Rule{
+		{ID: 101, Name: "lower", Enabled: true, Expr: "LOWER(city) = 'bj'"},
+		{ID: 102, Name: "isnotnull", Enabled: true, Expr: "phone IS NOT NULL"},
+		{ID: 103, Name: "not", Enabled: true, Expr: "NOT (risk_level = '高')"},
+		{ID: 104, Name: "regexp", Enabled: true, Expr: "phone REGEXP '^139'"},
+		{ID: 105, Name: "array", Enabled: true, Expr: "ARRAY_CONTAINS(tags, 'vip')"},
+		{ID: 106, Name: "json", Enabled: true, Expr: "JSON_EXTRACT(profile, '$.city') = '深圳'"},
+		{ID: 107, Name: "datediff", Enabled: true, Expr: "DATEDIFF('2026-06-28', last_login) <= 30"},
+		{ID: 108, Name: "datebetween", Enabled: true, Expr: "reg_date BETWEEN '2020-01-01' AND '2020-12-31'"},
+		{ID: 109, Name: "roundneg", Enabled: true, Expr: "ROUND(amount, -1) = 120"},
+	}
+}
+
+// TestQLBridgeFallbackToNative verifies engine.New()'s default qlbridge frontend
+// compiles the full documented feature set (via native fallback) and matches
+// exactly what the native frontend produces.
+func TestQLBridgeFallbackToNative(t *testing.T) {
+	native := engineWith(engine.NativeFrontend{})
+	ql := engineWith(engine.QLBridgeFrontend{})
+	if l, f := native.LoadRules(advancedRules()); f != 0 || l != 9 {
+		t.Fatalf("native advanced: loaded=%d failed=%d (want 9,0)", l, f)
+	}
+	if l, f := ql.LoadRules(advancedRules()); f != 0 || l != 9 {
+		t.Fatalf("qlbridge advanced: loaded=%d failed=%d (want 9,0) — fallback not working", l, f)
+	}
+	u := mkUser(1, map[string]any{
+		"city": "BJ", "phone": "13912345678", "risk_level": "低",
+		"tags":     []string{"vip", "new"},
+		"profile":  `{"city":"深圳"}`,
+		"last_login": "2026-06-10", "reg_date": "2020-06-15", "amount": 123.4,
+	})
+	a := sortedMatch(native, u)
+	b := sortedMatch(ql, u)
+	if !equalIDs(a, b) {
+		t.Fatalf("frontends disagree on advanced rules: native %v != qlbridge %v", a, b)
+	}
+	// all nine rules are crafted to match this user
+	want := []int64{101, 102, 103, 104, 105, 106, 107, 108, 109}
+	if !equalIDs(a, want) {
+		t.Errorf("advanced matches: got %v want %v", a, want)
+	}
+}
+
 func equalIDs(a, b []int64) bool {
 	if len(a) != len(b) {
 		return false

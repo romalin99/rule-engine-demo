@@ -44,6 +44,7 @@ const (
 	OpLength // pop x:     push LENGTH(x) (rune count)
 	OpAbs    // pop x:     push ABS(x)
 	OpRound  // pop x:     push ROUND(x) (nearest integer)
+	OpRound2 // pop d,x:   push ROUND(x, d) (round to d decimal places)
 	OpCeil   // pop x:     push CEIL(x)
 	OpFloor  // pop x:     push FLOOR(x)
 	OpSubstr // pop s,a,b: push SUBSTRING(s,a,b) (1-indexed)
@@ -58,8 +59,9 @@ const (
 	OpDateDiff    // pop a,b: push whole days (a - b)
 
 	// Array functions. Arrays reach the stack via OpLoadField -> toValue -> kArr.
-	OpArrLen      // pop arr:   push ARRAY_LENGTH(arr)
-	OpArrContains // pop arr,v: push v in arr
+	OpArrLen       // pop arr:      push ARRAY_LENGTH(arr)
+	OpArrContains  // pop arr,v:    push v in arr
+	OpArrIntersect // pop arr2,arr1: push (arr1 ∩ arr2 is non-empty)
 
 	// Date arithmetic (function-style DATE_ADD / DATE_SUB). Operands are popped
 	// from the stack; the result is an ISO date/datetime string. The 2-arg forms

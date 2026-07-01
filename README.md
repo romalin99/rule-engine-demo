@@ -16,8 +16,8 @@ SQL / 表达式 / CEL / JSON，统一编译成字节码，由一个自研 VM 对
 | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
 | DSL 输入：SQL(qlbridge)、SQL(自研)、JSON Rule                                                                            | ✅                                  |
 | DSL 输入：CEL、Expr                                                                                                      | 🔶 扩展点已留（`frontend_stub.go`） |
-| 算子：`= <> != > >= < <=`、`BETWEEN`、`IN`/`NOT IN`、`LIKE`/`NOT LIKE`、`REGEXP`/`NOT REGEXP`、`AND/OR`、`NOT (…)`、`IS [NOT] NULL`、括号优先级 | ✅ 原生/JSON 前端全覆盖             |
-| 函数：字符串 `LOWER/UPPER/TRIM/LENGTH/SUBSTRING`、数学 `ABS/ROUND/CEIL/FLOOR`、日期 `CURRENT_DATE/CURRENT_TIMESTAMP/YEAR/MONTH/DAY/DATEDIFF/DATE_ADD/DATE_SUB`、数组 `ARRAY_LENGTH/ARRAY_CONTAINS/ARRAY_OVERLAP` | ✅ 原生前端 + bytecode/ast（见 [docs/functions.md](docs/functions.md)） |
+| 算子：`= <> != > >= < <=`、`BETWEEN`（数值 + 字符串/日期区间）、`IN`/`NOT IN`、`LIKE`/`NOT LIKE`、`REGEXP`/`NOT REGEXP`、`AND/OR`、`NOT (…)`、`IS [NOT] NULL`、括号优先级 | ✅ 原生/JSON 前端全覆盖             |
+| 函数：字符串 `LOWER/UPPER/TRIM/LENGTH/SUBSTRING`（2 或 3 参）、数学 `ABS/ROUND`（`ROUND(x)` 取整或 `ROUND(x,d)` 保留小数）`/CEIL/FLOOR`、日期 `CURRENT_DATE/CURRENT_TIMESTAMP`（可作比较任意一侧）`/YEAR/MONTH/DAY/DATEDIFF/DATE_ADD/DATE_SUB`、数组 `ARRAY_LENGTH/ARRAY_CONTAINS/ARRAY_OVERLAP/ARRAY_INTERSECT` | ✅ 原生前端 + bytecode/ast（见 [docs/functions.md](docs/functions.md)） |
 | 集合判断：`EXISTS`、`ANY`/`ALL`（量词 + 行内子查询）；标量聚合子查询 `(SELECT COUNT/SUM/MIN/MAX/AVG(...) FROM 集合字段 WHERE …)` | ✅ 原生前端 + bytecode/ast          |
 | JSON 字段访问：`JSON_EXTRACT`/`JSON_VALUE`（`$.a.b[0]` 路径，字符串或已解析对象）                                        | ✅ 原生前端 + bytecode/ast          |
 | 正则匹配：`REGEXP`/`RLIKE`/`REGEXP_LIKE`（Go RE2，加载期预编译）                                                         | ✅ 原生前端 + bytecode/ast          |
