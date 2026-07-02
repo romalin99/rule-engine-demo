@@ -80,7 +80,7 @@ func (e *Engine) compile(rules []model.Rule) (progs []*model.RuleProgram, failed
 		if !r.Enabled {
 			continue
 		}
-		ast, err := e.backend.Compile(r.Expr)
+		ast, err := e.compileOne(r.Expr)
 		if err != nil {
 			failed++
 			continue
@@ -90,6 +90,23 @@ func (e *Engine) compile(rules []model.Rule) (progs []*model.RuleProgram, failed
 		})
 	}
 	return progs, failed
+}
+
+// compileOne compiles a single rule's text with panic containment. Rule text
+// is untrusted (POST /rules upserts it; the file watcher reloads it), and this
+// is the one choke point every compile path funnels through — LoadRules,
+// ReplaceRules, AddRule, ReloadFromFile. A recovered panic becomes a normal
+// compile error, so one hostile rule fails to load instead of taking down the
+// request goroutine (or, on the recover-less CLI path, the process). Parsing is
+// already depth-bounded and qlbridge parsing is isolated; this is the
+// defence-in-depth backstop around the whole front-end + lowering chain.
+func (e *Engine) compileOne(expr string) (ast any, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ast, err = nil, fmt.Errorf("rule compile panic (recovered): %v", r)
+		}
+	}()
+	return e.backend.Compile(expr)
 }
 
 // LoadRules compiles enabled rules and ADDS them to the cache (merge). Returns

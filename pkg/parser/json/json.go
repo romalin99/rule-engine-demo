@@ -53,13 +53,68 @@ func New() *Parser { return &Parser{} }
 // Name identifies the parser.
 func (*Parser) Name() string { return "json" }
 
+// maxJSONDepth bounds JSON-rule nesting. The recursive toIR walk below — and
+// every later recursive consumer of the IR (vm.Compile, the AST runtime, Emit)
+// — would blow the goroutine stack on a deeply nested document, which Go
+// cannot recover. This mirrors the native SQL parser's and engine.JSONFrontend's
+// bound so all JSON rule paths reject pathological nesting at load time with a
+// clean error. Well beyond any real rule.
+const maxJSONDepth = 200
+
 // Parse parses a JSON rule string into IR.
 func (*Parser) Parse(rule string) (api.Program, error) {
 	var raw node
 	if err := encjson.Unmarshal([]byte(rule), &raw); err != nil {
 		return nil, fmt.Errorf("json rule: %w", err)
 	}
+	// Bound nesting before the recursive lowering. checkDepth stops descending
+	// the instant it passes the cap, so its own recursion is capped too (it
+	// never goes deeper than maxJSONDepth+1 frames) — a hostile document fails
+	// here instead of overflowing the stack in toIR.
+	if err := checkDepth(&raw, 0); err != nil {
+		return nil, err
+	}
 	return raw.toIR()
+}
+
+// checkDepth verifies the decoded rule tree does not nest past maxJSONDepth.
+// It follows exactly the child links that toIR recurses through: not / and /
+// or, and the optional WHERE predicates of EXISTS, ANY/ALL and aggregate
+// sub-queries. It returns as soon as the cap is exceeded, so it is itself
+// depth-bounded and cannot overflow the stack while checking.
+func checkDepth(n *node, depth int) error {
+	if n == nil {
+		return nil
+	}
+	if depth > maxJSONDepth {
+		return fmt.Errorf("json rule: nested too deeply (max %d levels)", maxJSONDepth)
+	}
+	if err := checkDepth(n.Not, depth+1); err != nil {
+		return err
+	}
+	for i := range n.And {
+		if err := checkDepth(&n.And[i], depth+1); err != nil {
+			return err
+		}
+	}
+	for i := range n.Or {
+		if err := checkDepth(&n.Or[i], depth+1); err != nil {
+			return err
+		}
+	}
+	for _, sq := range []*subq{n.Exists, n.Any, n.All} {
+		if sq != nil {
+			if err := checkDepth(sq.Where, depth+1); err != nil {
+				return err
+			}
+		}
+	}
+	if n.Agg != nil {
+		if err := checkDepth(n.Agg.Where, depth+1); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type node struct {

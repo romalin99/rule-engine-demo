@@ -67,8 +67,26 @@ func (w *Watcher) checkOnce() {
 		return
 	}
 	w.last = fi.ModTime()
-	loaded, failed, err := w.eng.ReloadFromFile(w.path)
+	// A reload compiles untrusted-on-disk rule text. Compilation is already
+	// depth-bounded and panic-isolated, but contain any unforeseen panic here
+	// too: the watcher runs in a background goroutine (see cli.Serve), and an
+	// escaping panic would take the whole running server down over one bad
+	// rules file. Fail safe — report it through onReload and keep the previous
+	// rule set live; the loop survives to the next tick.
+	loaded, failed, err := w.reloadSafely()
 	if w.onReload != nil {
 		w.onReload(loaded, failed, err)
 	}
+}
+
+// reloadSafely runs ReloadFromFile with panic containment, turning a recovered
+// panic into a normal reload error (the live rule set is left untouched by a
+// failed atomic reload).
+func (w *Watcher) reloadSafely() (loaded, failed int, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			loaded, failed, err = 0, 0, fmt.Errorf("hot-reload panic (recovered), keeping current rules: %v", r)
+		}
+	}()
+	return w.eng.ReloadFromFile(w.path)
 }

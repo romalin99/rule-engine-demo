@@ -18,7 +18,12 @@ type panicBackend struct{}
 
 func (panicBackend) Name() string { return "panic-stub" }
 
-func (panicBackend) Compile(expr string) (any, error) { return expr, nil }
+func (panicBackend) Compile(expr string) (any, error) {
+	if expr == "compile-boom" {
+		panic("simulated compile panic")
+	}
+	return expr, nil
+}
 
 func (panicBackend) NewContext(fields map[string]any) any { return fields }
 func (panicBackend) Eval(_ any, ast any) bool {
@@ -92,6 +97,30 @@ func TestSecurityManagerTestPanicContainment(t *testing.T) {
 	// A normal rule still works after a recovered panic (state intact).
 	if _, err := m.Test("ok", map[string]any{"a": 1}); err != nil {
 		t.Errorf("normal draft test after recovery: %v", err)
+	}
+}
+
+// TestSecurityCompilePanicContainment: a panic while COMPILING untrusted rule
+// text (POST /rules upsert, file-watcher reload) must be contained at the
+// single compileOne choke point — the rule fails to load, the rest load
+// normally, and the process/goroutine survives. Round nine.
+func TestSecurityCompilePanicContainment(t *testing.T) {
+	e := NewWithBackend(panicBackend{})
+
+	// A batch where one rule panics at compile: it is counted failed, the
+	// others load, and LoadRules does not crash.
+	loaded, failed := e.LoadRules([]model.Rule{
+		{ID: 1, Expr: "ok-1", Enabled: true},
+		{ID: 2, Expr: "compile-boom", Enabled: true},
+		{ID: 3, Expr: "ok-3", Enabled: true},
+	})
+	if loaded != 2 || failed != 1 {
+		t.Fatalf("LoadRules with a compile-panicking rule: loaded=%d failed=%d (want 2/1)", loaded, failed)
+	}
+
+	// AddRule (the POST /rules path) surfaces the contained panic as an error.
+	if err := e.AddRule(model.Rule{ID: 9, Expr: "compile-boom", Enabled: true}); err == nil {
+		t.Error("AddRule of a compile-panicking rule should return an error, not crash")
 	}
 }
 

@@ -134,7 +134,31 @@
 > ③`reCacheN` 并发下可能少量 overshoot,已注明无害且测试留 +8 余量;④`matchInto` 具名返回 `out=dst`
 > 在 panic 时返回已收集匹配,语义为 fail-safe(已文档化)。
 
-## 11. 未实施建议(Roadmap)
+## 11. 协程与编译边界(第九轮:穷尽剩余 panic 逃逸面)
+
+对全部 `go` 协程与编译路径逐一核对——协程内 panic 无法在别处 recover,逃逸即杀进程。
+
+| 协程 / 路径 | 状态 |
+|------------|------|
+| kafka 分区 worker(`consumer.go:239`) | ✅ 既有内联 recover |
+| kafka 关闭等待(`consumer.go:452`) | ✅ 仅 `WaitGroup.Wait`+`close`,无 panic 面 |
+| redis / oracle 连接池监控 | ✅ 既有 `defer gos.Recover()` |
+| 批量匹配 worker(`workerpool.go:73`) | ✅ 经 `matchInto` 的 recover(第七轮) |
+| **文件热重载 watcher(`cli/run.go:215` → `Watcher.Run`)** | ✅ 本轮:`checkOnce` 经 `reloadSafely` 遏制 → 坏文件报错并保留现有规则集,循环存活;`Run` 自身仅 ticker/select 无 panic 面 |
+| **规则编译收口(`Engine.compile`)** | ✅ 本轮:抽出 `compileOne` 逐条 recover——覆盖 `LoadRules`/`ReplaceRules`/`AddRule`(=`POST /rules` 上报)/`ReloadFromFile` 全部编译路径,编译 panic → "编译失败" 而非崩溃 |
+
+**JSON 深度界补全**:第八轮补了 `engine.JSONFrontend`(入口可达);本轮补齐**独立** `pkg/parser/json`
+解析器(含 EXISTS/ANY/ALL/agg 子查询递归)——`Parse` 入口加**有界深度预检**(在上限处即返回,
+预检自身不溢出),零改动 6 个递归方法。二者深度界均为 200,与 native 对齐。
+
+**更正第八轮一处不准确记录**:`pkg/dtable` 经复核为**扁平结构**(`Row.toIR` 遍历平铺 `[]Cond`,
+`Cond.toIR` 只产叶子节点,无自递归),**无栈深度风险**,无需加界。此前"dtable 无界递归"的表述有误。
+
+> 结论:全仓 `go` 协程与规则编译路径的 panic **均已遏制或确认无面**。规则**求值**(第七/八轮三个
+> 边界)+ 规则**编译**(本轮收口)+ 规则**解析**(深度界,native/两个 JSON 解析器全覆盖)三段全绿。
+> 新增回归:`pkg/parser/json/depth_test.go`、`TestSecurityCompilePanicContainment`。
+
+## 12. 未实施建议(Roadmap)
 
 - 🔑 **控制台变更端点无鉴权**(`POST /rules`、`DELETE /rules/:id`、`POST /versions/:v/rollback`):
   企业部署下这是**首要加固项**。刻意不在库内硬编码鉴权(会给出虚假安全感,且租户/RBAC 模型需按部署
