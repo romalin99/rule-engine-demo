@@ -181,8 +181,8 @@ func TestQLBridgeFallbackToNative(t *testing.T) {
 	}
 	u := mkUser(1, map[string]any{
 		"city": "BJ", "phone": "13912345678", "risk_level": "低",
-		"tags":     []string{"vip", "new"},
-		"profile":  `{"city":"深圳"}`,
+		"tags":       []string{"vip", "new"},
+		"profile":    `{"city":"深圳"}`,
 		"last_login": "2026-06-10", "reg_date": "2020-06-15", "amount": 123.4,
 	})
 	a := sortedMatch(native, u)

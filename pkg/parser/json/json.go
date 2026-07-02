@@ -63,39 +63,37 @@ func (*Parser) Parse(rule string) (api.Program, error) {
 }
 
 type node struct {
+	Value  any    `json:"value"`
+	Exists *subq  `json:"exists"`
+	Agg    *aggq  `json:"agg"`
+	Not    *node  `json:"not"`
+	All    *subq  `json:"all"`
+	Any    *subq  `json:"any"`
+	Field  string `json:"field"`
+	JSON   string `json:"json"`
+	Flags  string `json:"flags"`
+	Op     string `json:"op"`
+	Values []any  `json:"values"`
 	And    []node `json:"and"`
 	Or     []node `json:"or"`
-	Not    *node  `json:"not"` // {"not": <node>} -> ir.Not
-	Field  string `json:"field"`
-	Op     string `json:"op"`
-	Value  any    `json:"value"`
-	Values []any  `json:"values"`
-
-	// Extensions (mirror the native SQL front-end's function/predicate set).
-	JSON   string `json:"json"`   // "$.path": wrap Field in JSON_EXTRACT(field, path)
-	Flags  string `json:"flags"`  // regexp flags, e.g. "i" (case-insensitive)
-	Exists *subq  `json:"exists"` // standalone EXISTS predicate
-	Any    *subq  `json:"any"`    // <left> <op> ANY(...)
-	All    *subq  `json:"all"`    // <left> <op> ALL(...)
-	Agg    *aggq  `json:"agg"`    // aggregate scalar sub-query as the left operand
 }
 
 // subq is the body of an EXISTS or ANY/ALL construct. Exactly one of Array,
 // Values or (Select+Coll) is used for ANY/ALL; EXISTS uses Coll [+ Where].
 type subq struct {
-	Array  string `json:"array"`  // array field — quantify over its elements
-	Values []any  `json:"values"` // value list — quantifier desugars to OR/AND
-	Select string `json:"select"` // projected column — sub-query quantifier
-	Coll   string `json:"coll"`   // collection field (EXISTS / sub-query)
-	Where  *node  `json:"where"`  // optional predicate over nested rows
+	Where  *node  `json:"where"`
+	Array  string `json:"array"`
+	Select string `json:"select"`
+	Coll   string `json:"coll"`
+	Values []any  `json:"values"`
 }
 
 // aggq is a scalar aggregate sub-query: (SELECT Fn(Col|*) FROM Coll [WHERE ...]).
 type aggq struct {
-	Fn    string `json:"fn"`   // COUNT/SUM/MIN/MAX/AVG
-	Col   string `json:"col"`  // "" or "*" for COUNT(*)
-	Coll  string `json:"from"` // collection field
 	Where *node  `json:"where"`
+	Fn    string `json:"fn"`
+	Col   string `json:"col"`
+	Coll  string `json:"from"`
 }
 
 func (n node) toIR() (ir.Node, error) {

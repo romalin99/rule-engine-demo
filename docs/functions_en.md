@@ -284,7 +284,8 @@ curl -s localhost:8080/rules/test -H 'Content-Type: application/json' \
 - `JSON_EXTRACT` / `JSON_VALUE` return scalar leaves only (objects/arrays → NULL);
   the path must be a string literal. The document may be a JSON string or an
   already-decoded object on the row.
-- `ROUND(x, d)` (two-arg) — only `ROUND(x)` to the nearest integer.
+- Inside string literals a backslash escapes only `\'` `\"` `\\`; every other
+  `\x` stays verbatim, so regex classes (`\d` `\w`) work either raw or doubled.
 - A full `SELECT … FROM … WHERE …;` wrapper — pass only the predicate expression
   (in-row subqueries excepted; see §5.5 of the Chinese reference).
 - Functions and set predicates are wired through the native SQL parser and emit

@@ -2,7 +2,8 @@ package ir
 
 import (
 	"fmt"
-	"strings"
+
+	"tcg-rulex-engine/pkg/sqlfn"
 )
 
 // Parse parses a rule expression into the IR.
@@ -37,9 +38,22 @@ func lexAll(s string) ([]token, error) {
 	}
 }
 
+// maxParseDepth bounds expression nesting (boolean nesting via parseUnary AND
+// operand/call nesting via parseTerm share the budget). It protects the
+// recursive-descent parser — and every downstream recursive consumer
+// (Compile, the AST runtime, Emit, Optimize) — from stack exhaustion on
+// hostile input like a megabyte of '(' characters: Go cannot recover a
+// goroutine stack overflow, so without a bound one malicious rule text could
+// kill the whole process. 200 levels is far beyond any real rule; for pure
+// boolean/paren nesting it also keeps parsed rules within the bytecode VM's
+// 256-slot operand stack (wide multi-argument call nests can still exceed it,
+// where the VM's own bounds check returns false rather than crashing).
+const maxParseDepth = 200
+
 type parser struct {
-	toks []token
-	i    int
+	toks  []token
+	i     int
+	depth int
 }
 
 func (p *parser) cur() token {
@@ -103,6 +117,13 @@ func (p *parser) parseAnd() (Node, error) {
 }
 
 func (p *parser) parseUnary() (Node, error) {
+	// Every nesting construct — parentheses, NOT, sub-query WHERE — recurses
+	// through parseUnary, so this single check bounds the whole grammar.
+	p.depth++
+	defer func() { p.depth-- }()
+	if p.depth > maxParseDepth {
+		return nil, fmt.Errorf("expression nested too deeply (max %d levels)", maxParseDepth)
+	}
 	// Prefix NOT: `NOT (expr)`, `NOT field = v`, `NOT NOT x`. It binds tighter
 	// than AND/OR but looser than a predicate, so it wraps whatever unary
 	// operand follows. `field NOT IN/LIKE` is handled inside parsePredicate.
@@ -174,6 +195,16 @@ func (p *parser) parsePredicate() (Node, error) {
 				return PredCall(call), nil
 			case "REGEXP_LIKE":
 				return regexpLikeToNode(call.Args)
+			case "MATCH":
+				// MATCH('prefix', ...): row-level field-name prefix test
+				// (qlbridge exists(match("k_"))) — a complete predicate.
+				return PredCall(call), nil
+			}
+			// Extended boolean builtins (pkg/sqlfn: CONTAINS / STARTSWITH /
+			// ENDSWITH / EQ / GT / ...) are complete predicates on their own,
+			// exactly like ARRAY_CONTAINS above.
+			if sqlfn.IsBoolFn(call.Fn) {
+				return PredCall(call), nil
 			}
 		}
 		return p.parseTermPredicate(left)
@@ -317,7 +348,17 @@ func (p *parser) parseValue() (Value, error) {
 
 // parseTerm parses a scalar operand: a literal, a field, or a function call.
 // It is the operand grammar shared by both sides of a CompareTerm.
+//
+// parseTerm carries the same nesting budget as parseUnary: deeply nested
+// CALLS (`F(F(F(...)))`) recurse through parseTerm/finishCall without ever
+// touching parseUnary, so they need their own guard against parser stack
+// exhaustion on hostile rule text.
 func (p *parser) parseTerm() (Term, error) {
+	p.depth++
+	defer func() { p.depth-- }()
+	if p.depth > maxParseDepth {
+		return nil, fmt.Errorf("expression nested too deeply (max %d levels)", maxParseDepth)
+	}
 	switch p.cur().Kind {
 	case tNumber:
 		return LitTerm{Val: Value{Num: p.advance().Text}}, nil
@@ -357,6 +398,11 @@ func (p *parser) finishCall(name string) (Term, error) {
 	if _, err := p.expect(tLParen, "'(' after function name"); err != nil {
 		return nil, err
 	}
+	// CAST(x AS type) is syntax, not a regular argument list: desugar it to
+	// the matching conversion function (TOINT / TONUMBER / TOSTRING / ...).
+	if upper(name) == "CAST" {
+		return p.finishCast()
+	}
 	var args []Term
 	if p.cur().Kind != tRParen {
 		for {
@@ -376,6 +422,55 @@ func (p *parser) finishCall(name string) (Term, error) {
 		return nil, err
 	}
 	return CallTerm{Fn: upper(name), Args: args}, nil
+}
+
+// finishCast parses `CAST(<term> AS <type>)` — the '(' is already consumed —
+// and desugars it to the matching conversion function, so no dedicated IR node
+// or opcode is needed. The emitted SQL is the desugared form (e.g. TOINT(x)),
+// which round-trips stably.
+func (p *parser) finishCast() (Term, error) {
+	arg, err := p.parseTerm()
+	if err != nil {
+		return nil, err
+	}
+	as, err := p.expect(tIdent, "AS in CAST(x AS type)")
+	if err != nil {
+		return nil, err
+	}
+	if upper(as.Text) != "AS" {
+		return nil, fmt.Errorf("expected AS in CAST(x AS type), got %q", as.Text)
+	}
+	ty, err := p.expect(tIdent, "type name after AS")
+	if err != nil {
+		return nil, err
+	}
+	fn, ok := castFn(upper(ty.Text))
+	if !ok {
+		return nil, fmt.Errorf("unsupported CAST type %q (want INT/FLOAT/STRING/BOOL/DATE/TIMESTAMP)", ty.Text)
+	}
+	if _, err := p.expect(tRParen, "')' to close CAST"); err != nil {
+		return nil, err
+	}
+	return CallTerm{Fn: fn, Args: []Term{arg}}, nil
+}
+
+// castFn maps a CAST target type to its conversion function.
+func castFn(ty string) (string, bool) {
+	switch ty {
+	case "INT", "INTEGER", "BIGINT", "SMALLINT":
+		return "TOINT", true
+	case "FLOAT", "DOUBLE", "DECIMAL", "NUMERIC", "NUMBER", "REAL":
+		return "TONUMBER", true
+	case "STRING", "CHAR", "VARCHAR", "TEXT":
+		return "TOSTRING", true
+	case "BOOL", "BOOLEAN":
+		return "TOBOOL", true
+	case "DATE":
+		return "TODATE", true
+	case "TIMESTAMP", "DATETIME":
+		return "TOTIMESTAMP", true
+	}
+	return "", false
 }
 
 // parseTermPredicate parses the predicate tail after a function-call left
@@ -509,8 +604,12 @@ func overlapToOr(args []Term) (Node, error) {
 }
 
 // regexpLikeToNode desugars REGEXP_LIKE(expr, pattern[, match_type]) into a
-// Regexp node. pattern must be a string literal; a match_type containing 'i'
-// makes the match case-insensitive (folded into the pattern as a `(?i)` flag).
+// Regexp node. pattern must be a string literal. match_type supports MySQL's
+// flags: 'i' case-insensitive / 'c' case-sensitive (the rightmost of i/c
+// wins, as in MySQL), 'm' multi-line anchors, 'n' lets '.' match newlines
+// (RE2 `s` flag), 'u' accepted and ignored (Unix-only line endings are RE2's
+// default). An unknown flag is a parse error, mirroring MySQL's
+// ER_REGEXP_BADARG instead of silently matching with different semantics.
 func regexpLikeToNode(args []Term) (Node, error) {
 	if len(args) < 2 || len(args) > 3 {
 		return nil, fmt.Errorf("REGEXP_LIKE expects (expr, pattern[, match_type])")
@@ -521,11 +620,50 @@ func regexpLikeToNode(args []Term) (Node, error) {
 	}
 	pat := lit.Val.Str
 	if len(args) == 3 {
-		if mt, ok := args[2].(LitTerm); ok && mt.Val.IsString && strings.Contains(mt.Val.Str, "i") {
-			pat = "(?i)" + pat
+		mt, ok := args[2].(LitTerm)
+		if !ok || !mt.Val.IsString {
+			return nil, fmt.Errorf("REGEXP_LIKE match_type must be a string literal")
+		}
+		flags, err := regexpFlags(mt.Val.Str)
+		if err != nil {
+			return nil, err
+		}
+		if flags != "" {
+			pat = "(?" + flags + ")" + pat
 		}
 	}
 	return Regexp{Left: args[0], Pattern: pat}, nil
+}
+
+// regexpFlags renders a MySQL REGEXP_LIKE match_type as RE2 inline flags.
+func regexpFlags(matchType string) (string, error) {
+	caseInsensitive, multiLine, dotAll := false, false, false
+	for _, r := range matchType {
+		switch r {
+		case 'i':
+			caseInsensitive = true
+		case 'c': // rightmost of i/c wins (MySQL rule)
+			caseInsensitive = false
+		case 'm':
+			multiLine = true
+		case 'n':
+			dotAll = true
+		case 'u': // Unix-only line endings: RE2's only mode — nothing to set
+		default:
+			return "", fmt.Errorf("REGEXP_LIKE: unsupported match_type flag %q (want i/c/m/n/u)", string(r))
+		}
+	}
+	flags := ""
+	if caseInsensitive {
+		flags += "i"
+	}
+	if multiLine {
+		flags += "m"
+	}
+	if dotAll {
+		flags += "s"
+	}
+	return flags, nil
 }
 
 // parseExists parses `EXISTS ( coll )` or `EXISTS ( SELECT … FROM coll [WHERE
@@ -560,7 +698,7 @@ func (p *parser) parseExists() (Node, error) {
 // array field (runtime element expansion), or a value list (desugared to an
 // OR/AND of comparisons). The ANY/ALL keyword has been peeked (not consumed).
 func (p *parser) parseQuant(left Term, op string, all bool) (Node, error) {
-	p.advance() // ANY / ALL / SOME
+	p.advance()     // ANY / ALL / SOME
 	if op == "==" { // normalize to '=' so both runtimes compare identically
 		op = "="
 	}
@@ -575,7 +713,7 @@ func (p *parser) parseQuant(left Term, op string, all bool) (Node, error) {
 			return nil, err
 		}
 		if col == "" {
-			return nil, fmt.Errorf("ANY/ALL sub-query must project a column: SELECT col FROM ...")
+			return nil, fmt.Errorf("ANY/ALL sub-query must project a column (SELECT col FROM coll)")
 		}
 		if _, err := p.expect(tRParen, "')' to close ANY/ALL sub-query"); err != nil {
 			return nil, err
@@ -602,9 +740,18 @@ func (p *parser) parseQuant(left Term, op string, all bool) (Node, error) {
 	}
 
 	// A single bare field reference ranges over that array field's elements.
+	// So does a single call to an array-RETURNING function, which lets the
+	// quantifiers compose with computed arrays: `'b' = ANY(SPLIT(csv, ','))`,
+	// `x = ANY(MAPKEYS(attrs))`. Both runtimes already evaluate QuantArr over
+	// any Term (the VM sees a kArr on the stack, the AST goes through arrayOf);
+	// scalar-returning calls keep the value-list desugar below, so
+	// `x = ANY(LOWER(y))` still means a plain comparison.
 	if len(items) == 1 {
 		if ft, ok := items[0].(FieldTerm); ok {
 			return QuantArr{Left: left, Op: op, All: all, Array: ft}, nil
+		}
+		if ct, ok := items[0].(CallTerm); ok && returnsArray(ct.Fn) {
+			return QuantArr{Left: left, Op: op, All: all, Array: ct}, nil
 		}
 	}
 
@@ -621,6 +768,18 @@ func (p *parser) parseQuant(left Term, op string, all bool) (Node, error) {
 		return args[0], nil
 	}
 	return Logic{Op: logicOp, Args: args}, nil
+}
+
+// returnsArray reports whether a function statically returns an array value,
+// making it a valid quantifier source (`ANY/ALL(f(...))`). JMESPATH is
+// deliberately absent: its result shape depends on the expression at runtime,
+// so it keeps the scalar value-list reading.
+func returnsArray(fn string) bool {
+	switch fn {
+	case "SPLIT", "MAPKEYS", "MAPVALUES", "ARRAY_SLICE", "DOMAINS", "HOSTS":
+		return true
+	}
+	return false
 }
 
 // parseSubSelect parses the body `SELECT (col | 1 | *) FROM coll [WHERE pred]`

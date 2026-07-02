@@ -86,6 +86,26 @@ const (
 
 	// Scalar aggregate sub-query: (SELECT AGG(col) FROM coll [WHERE pred]).
 	OpAggSub // A=agg idx: push the aggregate scalar (Program.Aggs[A])
+
+	// Extended builtin call — the qlbridge-parity function library (pkg/sqlfn:
+	// CONTAINS / SPLIT / SQRT / TOINT / NOW / EMAIL / HOST / MD5 / ...). The
+	// operand packs the builtin ID and the call-site argument count:
+	// A = id<<8 | argc (argc <= 255, validated at compile time). Eval pops argc
+	// values, calls the builtin, and pushes its result (NULL -> undef; the
+	// boolean predicates push a bool).
+	OpCallB
+
+	// Row-level and raw-field factors (second qlbridge-parity batch). These
+	// need the raw row (not stack values), so each carries a pool index.
+	OpMatchPre // A=str idx:  push true when some row field named with the prefix is non-null (qlbridge match)
+	OpMapKeys  // A=field idx: push sorted keys of a map/JSON-object field as an array (qlbridge mapkeys)
+	OpMapVals  // A=field idx: push values (ordered by sorted key) of a map/JSON-object field (qlbridge mapvalues)
+
+	// JMESPath over a JSON document (qlbridge json.jmespath): like
+	// OpJSONField/OpJSONExpr but with a full JMESPath expression, evaluated by
+	// pkg/sqlfn (expression pre-compiled and cached at rule load).
+	OpJmesField // A=json idx: push JMESPath result from a raw field doc (Program.JSONs[A])
+	OpJmesExpr  // A=json idx: pop doc-string -> push JMESPath result
 )
 
 // AggOp describes one scalar aggregate sub-query. Fn is COUNT/SUM/MIN/MAX/AVG;
@@ -129,10 +149,10 @@ type Instr struct {
 
 // Program is compiled bytecode plus its constant pools.
 type Program struct {
-	Source string
-	Code   []Instr
-	Nums   []float64
-	Strs   []string
+	Source  string
+	Code    []Instr
+	Nums    []float64
+	Strs    []string
 	Fields  []string
 	Sets    []map[string]struct{}
 	Subs    []SubProg        // compiled sub-queries referenced by OpExistsSub/OpQuantSub

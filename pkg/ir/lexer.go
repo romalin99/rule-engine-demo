@@ -118,9 +118,20 @@ func (l *lexer) lexString(quote rune) (token, error) {
 	var sb []rune
 	for l.pos < len(l.src) {
 		c := l.src[l.pos]
-		if c == '\\' && l.pos+1 < len(l.src) { // escaped char
-			sb = append(sb, l.src[l.pos+1])
-			l.pos += 2
+		if c == '\\' && l.pos+1 < len(l.src) {
+			// A backslash escapes ONLY a quote character or another backslash
+			// (\' \" \\). Every other \x sequence is kept verbatim, so regular
+			// expressions keep their character classes: REGEXP '^1\d{10}$' must
+			// compile the pattern ^1\d{10}$, not ^1d{10}$. (The old rule of
+			// unescaping every \x silently corrupted \d \w \s \b \. patterns.)
+			next := l.src[l.pos+1]
+			if next == '\'' || next == '"' || next == '\\' {
+				sb = append(sb, next)
+				l.pos += 2
+				continue
+			}
+			sb = append(sb, c) // literal backslash: leave \x intact
+			l.pos++
 			continue
 		}
 		if c == quote {

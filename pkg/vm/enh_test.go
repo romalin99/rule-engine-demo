@@ -26,7 +26,8 @@ func runAgree(t *testing.T, cases []struct {
 	rule string
 	row  map[string]any
 	want bool
-}) {
+},
+) {
 	t.Helper()
 	rt := astrt.New()
 	for _, c := range cases {
@@ -113,7 +114,7 @@ func TestEnhStringBetween(t *testing.T) {
 		{"register_date BETWEEN '2020-01-01' AND '2020-12-31'", map[string]any{"register_date": "2021-01-01"}, false},
 		{"register_date BETWEEN '2020-01-01' AND '2020-12-31'", map[string]any{"register_date": "2020-01-01"}, true}, // inclusive lo
 		{"register_date BETWEEN '2020-01-01' AND '2020-12-31'", map[string]any{"register_date": "2020-12-31"}, true}, // inclusive hi
-		{"register_date BETWEEN '2020-01-01' AND '2020-12-31'", map[string]any{}, false},                            // missing -> false
+		{"register_date BETWEEN '2020-01-01' AND '2020-12-31'", map[string]any{}, false},                             // missing -> false
 		{"grade BETWEEN 'A' AND 'C'", map[string]any{"grade": "B"}, true},
 		{"grade BETWEEN 'A' AND 'C'", map[string]any{"grade": "D"}, false},
 		// numeric BETWEEN still works (fast path, unchanged)
@@ -152,7 +153,7 @@ func TestEnhSubstr2(t *testing.T) {
 		{"SUBSTRING(phone, 8) = '5678'", map[string]any{"phone": "13912345678"}, true},
 		{"SUBSTR(name, 2) = '码城'", map[string]any{"name": "数码城"}, true},
 		{"SUBSTRING(name, 1) = '数码城'", map[string]any{"name": "数码城"}, true}, // whole string
-		{"SUBSTRING(name, 4) = ''", map[string]any{"name": "数码城"}, true},     // past end -> empty
+		{"SUBSTRING(name, 4) = ''", map[string]any{"name": "数码城"}, true},    // past end -> empty
 		{"SUBSTRING(code, 3) = 'CDE'", map[string]any{"code": "ABCDE"}, true},
 		// 3-arg SUBSTRING still works
 		{"SUBSTRING(name, 1, 2) = '数码'", map[string]any{"name": "数码城"}, true},
@@ -169,10 +170,10 @@ func TestEnhArrayIntersect(t *testing.T) {
 	}{
 		{"ARRAY_INTERSECT(tags, vips)", map[string]any{"tags": []string{"a", "b", "c"}, "vips": []string{"x", "b"}}, true},
 		{"ARRAY_INTERSECT(tags, vips)", map[string]any{"tags": []string{"a", "b", "c"}, "vips": []string{"x", "y"}}, false},
-		{"ARRAY_INTERSECT(ids, others)", map[string]any{"ids": []any{1, 5, 9}, "others": []any{5, 7}}, true},   // numeric, common 5
-		{"ARRAY_INTERSECT(ids, others)", map[string]any{"ids": []any{1, 5, 9}, "others": []any{2, 7}}, false},  // numeric, no common
-		{"ARRAY_INTERSECT(tags, vips)", map[string]any{"tags": []string{}, "vips": []string{"a"}}, false},      // empty -> false
-		{"ARRAY_INTERSECT(tags, vips)", map[string]any{"tags": []string{"a"}}, false},                          // missing operand -> false
+		{"ARRAY_INTERSECT(ids, others)", map[string]any{"ids": []any{1, 5, 9}, "others": []any{5, 7}}, true},  // numeric, common 5
+		{"ARRAY_INTERSECT(ids, others)", map[string]any{"ids": []any{1, 5, 9}, "others": []any{2, 7}}, false}, // numeric, no common
+		{"ARRAY_INTERSECT(tags, vips)", map[string]any{"tags": []string{}, "vips": []string{"a"}}, false},     // empty -> false
+		{"ARRAY_INTERSECT(tags, vips)", map[string]any{"tags": []string{"a"}}, false},                         // missing operand -> false
 		{"NOT ARRAY_INTERSECT(tags, vips)", map[string]any{"tags": []string{"a"}, "vips": []string{"b"}}, true},
 		// combined with the rest of the grammar
 		{"ARRAY_INTERSECT(tags, vips) AND age >= 18", map[string]any{"tags": []string{"vip"}, "vips": []string{"vip"}, "age": 20}, true},

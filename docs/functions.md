@@ -38,6 +38,15 @@
 ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。比较的**任意一侧**
 都可以是字段、字面量或函数调用,例如 `LENGTH(a) = LENGTH(b)`、`last_login >= CURRENT_DATE`。
 
+**布尔字段**在字符串上下文一律渲染为 `'true'`/`'false'`(两套运行时一致):
+`flag = 'true'`、`is_vip = is_active`、`UPPER(flag) = 'TRUE'`、`flag REGEXP '^tr'`、
+`flag = ANY(SELECT passed FROM checks)` 均按此语义求值;数学函数(`ABS` 等)对布尔
+操作数返回 NULL,`TOINT(flag)` 可显式转 1/0。
+
+**数字字面量**支持整数、小数与**负数**(`-` 紧跟数字即负号,本语法无二元减法),可用于任意
+操作数位置:`temperature < -10`、`balance >= -100`、`lat BETWEEN -90 AND 90`、
+`offset IN (-1, 0, 1)`、`DATE_ADD(d, -7)`、`ROUND(x, -1)`。
+
 ---
 
 ## 3. NULL 语义(重要)(NULL semantics)
@@ -88,6 +97,11 @@ ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。�
 ```
 
 > `<>` 是 `!=` 的 SQL 别名(等价)。`LIKE` 仅识别 `%`(前缀/后缀/包含),`_` 按普通字符处理。
+>
+> `IN` 按**文本**匹配:数字字面量以书写形式参与比较,数字字段按规范渲染(无多余小数位)。
+> 因此请规范书写数字——`IN (1, 2)` 能匹配数值 1,而 `IN (1.0)`、`IN (01)` 不能(与 MySQL 的
+> 数值强转不同,本引擎不做隐式转换;需要数值语义时可写 `x = 1.0 OR x = 2.5` 或 `x = ANY(1.0, 2.5)`,
+> 比较两侧数字时按数值比较)。
 
 ---
 
@@ -102,7 +116,7 @@ ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。�
 | ---- | ---- | ---- |
 | `LOWER(x)` / `UPPER(x)` | 字符串 | 转小写 / 大写 |
 | `TRIM(x)` | 字符串 | 去除首尾空白 |
-| `LENGTH(x)` | 数字 | **字符数(rune)**,中文安全 |
+| `LENGTH(x)` | 数字 | **字符数(rune)**,中文安全;数组操作数返回**元素个数**(同 `ARRAY_LENGTH`) |
 | `SUBSTRING(s, start, len)` / `SUBSTR` | 字符串 | **从 1 开始**、按 rune 截取;越界截断为 `''` |
 | `SUBSTRING(s, start)` / `SUBSTR` | 字符串 | 两参形式:从 `start`(1 起)截到**字符串末尾** |
 
@@ -206,6 +220,7 @@ ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。�
 | `x <op> ALL (v1, v2, …)` | 对每个 `vi` 都有 `x op vi`(脱糖为 `AND`) |
 | `x <op> ANY (arrField)` | 对数组字段的**任一元素**成立 |
 | `x <op> ALL (arrField)` | 对数组字段的**所有元素**成立 |
+| `x <op> ANY/ALL (数组函数(…))` | 对**计算数组**的元素成立:`'b' = ANY(SPLIT(csv, ','))`、`x = ANY(MAPKEYS(attrs))`(识别 `SPLIT`/`MAPKEYS`/`MAPVALUES`/`ARRAY_SLICE`/`DOMAINS`/`HOSTS`;标量函数保持"单值列表"的普通比较语义) |
 
 > 空集 / 缺失数组的语义同 SQL:`ANY` 为假、`ALL` 为真。元素在左操作数为数字且元素可解析为数字时按**数值**比较,否则按字符串。
 
@@ -266,15 +281,21 @@ ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。�
 ### 5.6 正则匹配 (REGEXP)
 
 `x REGEXP '正则'` 用 **Go RE2** 语法对左操作数(先渲染为字符串)做正则匹配;`RLIKE`
-是同义词。函数形式 `REGEXP_LIKE(x, '正则' [, 'i'])` 等价,`i` 标志做大小写不敏感
-(等价于模式前加 `(?i)`)。左操作数为 NULL 时不匹配。
+是同义词。函数形式 `REGEXP_LIKE(x, '正则' [, match_type])` 等价,支持 MySQL 的
+match_type 标志(折叠为模式前缀 `(?i)`/`(?m)`/`(?s)`):`i` 大小写不敏感、`c` 大小写敏感
+(i/c 同时出现时**最右者生效**,MySQL 规则)、`m` 多行锚点、`n` 让 `.` 匹配换行、
+`u` 接受但无操作(RE2 本就只认 Unix 行尾);**未知标志在编译期报错**。
+左操作数为 NULL 时不匹配。
 
 | 形式 | 含义 |
 | ---- | ---- |
 | `x REGEXP 'p'` / `x RLIKE 'p'` | x 匹配正则 p |
 | `x NOT REGEXP 'p'` | x 不匹配 p |
 | `REGEXP_LIKE(x, 'p')` | 同 `x REGEXP 'p'` |
-| `REGEXP_LIKE(x, 'p', 'i')` | 大小写不敏感匹配 |
+| `REGEXP_LIKE(x, 'p', 'i')` | 大小写不敏感匹配(`'ci'` 则敏感;`'in'` = 不敏感 + `.` 跨行) |
+
+> 字符串字面量中反斜杠仅转义 `\'` `\"` `\\`,其余 `\x` 原样保留——正则可直接写
+> `'^1\d{10}$'`,MySQL 风格的 `'^1\\d{10}$'` 同样有效(二者等价)。
 
 > 模式在加载期**预编译**一次(RE2,线性时间、无回溯灾难)。左操作数可为字段或函数调用,
 > 如 `LOWER(name) REGEXP '^a'`、`JSON_EXTRACT(p, '$.city') REGEXP '深'`。
@@ -307,6 +328,172 @@ ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。�
 规则: JSON_EXTRACT(profile, '$.addr.zip') = '518000'  → 命中
 规则: JSON_EXTRACT(profile, '$.missing') IS NULL      → 命中
 ```
+
+### 5.8 扩展函数库:qlbridge 计算因子对齐 (Extended builtins)
+
+以下函数补齐 [qlbridge](https://github.com/araddon/qlbridge) 内置计算因子(`pkg/sqlfn`,
+两套运行时同实现)。**NULL 传播**:任一必需参数为 NULL 时结果为 NULL;布尔谓词函数遇 NULL 判 `false`。
+函数名大小写不敏感;qlbridge 中带点的名字(`hash.md5`)改为下划线/别名形式(`HASH_MD5`/`MD5`)。
+
+**字符串**(qlbridge: `tolower/strip/replace/split/join/contains/hasprefix/hassuffix`):
+
+| 函数 | 返回 | 说明 |
+| ---- | ---- | ---- |
+| `TOLOWER(x)` / `TOUPPER(x)` | 字符串 | `LOWER`/`UPPER` 的 qlbridge 别名 |
+| `STRIP(x)` | 字符串 | 去首尾空白(同 `TRIM`) |
+| `CHAR_LENGTH(x)` | 数字 | 字符数(rune;仅字符串) |
+| `REPLACE(s, old [, new])` | 字符串 | 全量替换;省略 `new` 即删除 `old` |
+| `SPLIT(s, sep)` | 数组 | 按 `sep` 切分;可与 `ARRAY_*` 组合,如 `ARRAY_CONTAINS(SPLIT(csv,','),'x')`;空分隔符 → NULL |
+| `JOIN(v1, …, sep)` | 字符串 | 末参为分隔符;数组参数展开其元素;NULL 参数跳过 |
+| `CONCAT(v1, v2, …)` | 字符串 | 拼接(MySQL 语义:任一参数 NULL → NULL) |
+| `CONTAINS(s, sub)` | **布尔** | 子串判断,可独立作谓词 |
+| `STARTSWITH` / `HASPREFIX(s, p)` | **布尔** | 前缀判断 |
+| `ENDSWITH` / `HASSUFFIX(s, p)` | **布尔** | 后缀判断 |
+
+**函数式比较**(qlbridge: `eq/ne/gt/ge/lt/le`;语义与运算符完全一致,NULL → false):
+`EQ(a,b)` `NE(a,b)` `GT(a,b)` `GE(a,b)` `LT(a,b)` `LE(a,b)`,如 `GT(LENGTH(name), 2)`。
+比较(无论运算符还是函数形式)**不定义在数组操作数上**——判数组请用 `ARRAY_*` 谓词。
+
+**数学与类型转换**(qlbridge: `sqrt/pow/toint/tonumber/tobool/oneof`):
+
+| 函数 | 返回 | 说明 |
+| ---- | ---- | ---- |
+| `SQRT(x)` | 数字 | 平方根;负数 → NULL |
+| `POW(x, y)` / `POWER` | 数字 | 幂;结果非有限 → NULL |
+| `TOINT(x)` | 数字 | 取整(向零截断);字符串先去空格与千分位逗号;布尔 → 1/0 |
+| `TONUMBER(x)` | 数字 | 同上,不截断 |
+| `TOBOOL(x)` | 布尔值 | `true/t/1/yes/y/on` 与 `false/f/0/no/n/off`(不区分大小写);数字 0=false;比较时渲染为 `'true'`/`'false'` |
+| `TOSTRING(x)` | 字符串 | 渲染为文本 |
+| `ONEOF(v1, v2, …)` / `COALESCE` | 任意 | 第一个非 NULL 参数 |
+
+**日期时间**(qlbridge: `now/todate/totimestamp/dayofweek/hourofday/hourofweek/monthofyear/yy/mm/yymm`;
+`[x]` 表示参数可省,省略取当前时刻):
+
+| 函数 | 返回 | 说明 |
+| ---- | ---- | ---- |
+| `NOW()` | 字符串 | 当前时刻(带括号形式的 `CURRENT_TIMESTAMP`) |
+| `TODATE(x)` / `TODATE(layout, x)` | 字符串 | 归一化为 `YYYY-MM-DD`;两参形式用 Go 参考布局解析(qlbridge 参数序) |
+| `TOTIMESTAMP(x)` | 数字 | Unix 秒;`UNIX_TIMESTAMP([x])` 同义(可无参) |
+| `HOUR(x)` / `MINUTE(x)` / `SECOND(x)` | 数字 | 时/分/秒(纯日期视为 0 点) |
+| `DAYOFWEEK([x])` | 数字 | **0=周日 … 6=周六**(Go/qlbridge 编号,注意与 MySQL 的 1 起不同) |
+| `HOUROFDAY([x])` | 数字 | 0-23 |
+| `HOUROFWEEK([x])` | 数字 | 0-167(周日起 `weekday*24+hour`) |
+| `MONTHOFYEAR([x])` / `MM([x])` | 数字 | 1-12 |
+| `YY([x])` | 数字 | 两位年(2026 → 26) |
+| `YYMM([x])` | 字符串 | 年月批次,如 `'2607'` |
+
+**邮箱与 URL**(qlbridge: `email/emailname/emaildomain/host/domain/path/qs/urldecode/urlmain/urlminusqs`):
+
+| 函数 | 返回 | 说明 |
+| ---- | ---- | ---- |
+| `EMAIL(x)` | 字符串 | 规范化地址(小写、去显示名);非法 → NULL |
+| `EMAILNAME(x)` / `EMAILDOMAIN(x)` | 字符串 | `@` 前的本地部分 / `@` 后的域名 |
+| `HOST(x)` | 字符串 | URL 主机(小写、去端口);无 scheme 的输入自动按 `http://` 解析 |
+| `DOMAIN(x)` | 字符串 | 基础域名(主机最后两级标签,朴素实现、无公共后缀表) |
+| `PATH(x)` / `URLPATH(x)` | 字符串 | 路径部分 |
+| `QS(x, key)` | 字符串 | 查询串参数值;参数不存在 → NULL |
+| `URLDECODE(x)` | 字符串 | 百分号解码(`+` 视为空格) |
+| `URLMAIN(x)` | 字符串 | 去掉查询串与锚点的 URL |
+| `URLMINUSQS(x, key)` | 字符串 | 删除指定查询参数后的 URL(其余参数按键排序重编码) |
+
+**哈希与编码**(qlbridge: `hash.md5/hash.sha1/hash.sha256/hash.sha512/encoding.b64encode/encoding.b64decode`):
+`MD5(x)`/`HASH_MD5`、`SHA1`/`HASH_SHA1`、`SHA256`/`HASH_SHA256`、`SHA512`/`HASH_SHA512`(小写十六进制),
+`B64ENCODE(x)`、`B64DECODE(x)`(标准 base64;解码失败 → NULL)。
+
+**数组定位**(qlbridge: `array.index/array.slice`;判含/交集/长度见 [§5.4](#54-数组函数-array)):
+
+| 函数 | 返回 | 说明 |
+| ---- | ---- | ---- |
+| `ARRAY_INDEX(arr, i)` | 字符串 | 第 `i` 个元素(**0 起**,qlbridge 编号);越界/负下标 → NULL |
+| `ARRAY_SLICE(arr, start [, end])` | 数组 | 半开区间 `[start, end)`(0 起);负下标从末尾数;越界收敛;`end` 省略取到末尾 |
+
+**CAST 语法**(qlbridge: `cast`):`CAST(x AS 类型)` 是语法糖,解析期脱糖为对应转换函数——
+`INT/INTEGER/BIGINT/SMALLINT → TOINT`、`FLOAT/DOUBLE/DECIMAL/NUMERIC/NUMBER/REAL → TONUMBER`、
+`STRING/CHAR/VARCHAR/TEXT → TOSTRING`、`BOOL/BOOLEAN → TOBOOL`、`DATE → TODATE`、
+`TIMESTAMP/DATETIME → TOTIMESTAMP`(Unix 秒)。导出的 SQL 为脱糖形式(如 `TOINT(x)`)。
+
+**行级匹配**(qlbridge: `match` + `exists(match(...))`):
+
+| 函数 | 返回 | 说明 |
+| ---- | ---- | ---- |
+| `MATCH('prefix' [, 'prefix2', …])` | **布尔** | 当前行存在**字段名以任一前缀开头**且值非 NULL 的字段;前缀须为非空字符串字面量 |
+
+**Map 字段**(qlbridge: `mapkeys/mapvalues`;操作数须为**字段引用**,可为 `map[string]any` 或 JSON 对象字符串):
+
+| 函数 | 返回 | 说明 |
+| ---- | ---- | ---- |
+| `MAPKEYS(field)` | 数组 | 键名,**按字典序排序**(保证求值确定性) |
+| `MAPVALUES(field)` | 数组 | 值(按排序后的键序渲染为文本) |
+
+**JMESPath**(qlbridge: `json.jmespath`;表达式须为字符串字面量,加载期预编译,语法错误在编译时报出):
+
+| 函数 | 返回 | 说明 |
+| ---- | ---- | ---- |
+| `JMESPATH(doc, 'expr')` / `JSON_JMESPATH` | 标量或数组 | 完整 [JMESPath](https://jmespath.org) 查询:过滤 `[?a==\`1\`]`、投影、`length(@)` 等;`doc` 同 `JSON_EXTRACT`(JSON 字符串或已解析对象字段);标量直返,**全标量数组返回数组**(可喂给 `ARRAY_*`),对象/混合数组 → NULL |
+
+**User-Agent**(qlbridge: `useragent`):`USERAGENT(ua, part)`,`part` 取
+`bot`/`mobile`(布尔)、`browser`/`browser_version`/`engine`/`engine_version`/`os`/`platform`/`mozilla`/`localization`(字符串,缺失 → NULL)。
+
+**SipHash 与时区**(qlbridge: `hash.sip/todatein`):
+
+| 函数 | 返回 | 说明 |
+| ---- | ---- | ---- |
+| `HASH_SIP(x)` / `SIPHASH(x)` | 字符串 | SipHash-2-4(固定密钥 k0=0,k1=1),64 位结果以**十进制字符串**返回(float64 存不下全部 uint64) |
+| `TODATEIN(tz, x)` | 字符串 | 把 `x` 按 IANA 时区 `tz` 的墙钟时间解析,**归一化为 UTC** 的 `YYYY-MM-DD HH:MM:SS`;未知时区/无法解析 → NULL(依赖宿主 tzdata) |
+
+**批量域名/主机**(qlbridge: `domains/hosts`):`DOMAINS(v1, …)`、`HOSTS(v1, …)`——对每个 URL 参数
+(数组参数展开)提取基础域名/主机,去重保序返回数组;无有效结果 → NULL。
+
+**strftime 格式化**(qlbridge: `strftime/extract`):`STRFTIME(x, fmt)`、`EXTRACT(x, fmt)`(同义)。
+支持 `%Y %y %m %d %e %H %I %M %S %p %a %A %b %B %j %w %s %%`,未识别的代码原样输出。
+如 `EXTRACT(ts, '%H') = '15'`、`STRFTIME(d, '%Y-%m') = '2026-07'`(返回**字符串**)。
+
+**第三批对齐因子**(2026-07-02 与 qlbridge 注册表逐名比对后补齐;qlbridge:
+`seconds/unixtrunc/unsign/string.index/string.titlecase/qs2/url.matchqs/sum/avg/count/hash`):
+
+| 函数 | 返回 | 说明 |
+| ---- | ---- | ---- |
+| `SECONDS(x)` | 数字 | 值折算为秒:日期/时间串 → Unix 秒(`'2015/07/04'`→1435968000);`'MM:SS'`(可带 `M` 前缀:`'M10:30'`→630、`'100:30'`→6030)→ 分×60+秒;数字/数字串直返;`'0:00'` → NULL(qlbridge 行为) |
+| `UNIXTRUNC(x [, p])` | **字符串** | Unix 时间戳截断(qlbridge/BigQuery 风格)。`x` 为日期串、epoch 数字或全数字 epoch 串(按位数辨单位:10=秒,13=毫秒,16=微秒,19=纳秒)。单参 → 整秒 `'1438445529'`;`p`=`'s'/'seconds'` → `'1438445529.707'`,`'ms'/'milliseconds'` → `'1438445529707'`,`'sm'/'secondsmicro'` → `'1438445529.707123'`;未知 `p` → NULL |
+| `UNSIGN(x)` | **字符串** | 整数按二补码读作无符号:`UNSIGN(-70)='18446744073709551546'`(uint64 超出 float64 精度,故返回十进制字符串,与 `HASH_SIP` 同理) |
+| `STRING_INDEX(s, sub)` | 数字 | `sub` 在 `s` 中首次出现的 **0 起**字节偏移;不存在 → NULL(qlbridge `string.index`) |
+| `TITLECASE(x)` | 字符串 | 每个词首字母大写(`strings.Title` 语义:字母/数字/下划线**不是**分词符,`'foo_bar'→'Foo_bar'`) |
+| `QS2(x, key)` / `QSL` | 字符串 | `QS` 的别名——本实现本就是 qlbridge `qs2` 的**保大小写**语义(qlbridge 旧版 `qs`/`qsl` 会把整个 URL 转小写,损坏混合大小写的参数值;此处按现代语义统一) |
+| `URL_MATCHQS(url [, re…])` | 字符串 | URL 化简为 `host+path`,仅保留**参数名**匹配任一正则的查询参数(按键排序重编码);不带正则则丢弃全部参数;URL/正则非法 → NULL。沿 qlbridge:此因子**不补 scheme**,无 scheme 输入的 host 视为空 |
+| `SUM(v, …)` | 数字 | 变参求和:数组参数展开(宽松跳过不可解析元素)、数字串参与、NULL 跳过;布尔参数使整体 NULL;**合计恰为 0 → NULL**(qlbridge 行为,保证移植的 `sum(...) = 0` 规则语义不变) |
+| `AVG(v, …)` | 数字 | 变参均值:数组元素**严格**(任一坏元素 → NULL),标量字符串宽松跳过;无有效贡献 → NULL |
+| `COUNT(x)` | 数字 | 出现标记(qlbridge `count`,非表聚合):非空值 → 1;NULL / `''` / 空数组 → NULL。集合计数请用 `(SELECT COUNT(*) FROM coll)` 或 `ARRAY_LENGTH` |
+| `HASH(x)` | 字符串 | `HASH_SIP` 的别名(qlbridge 把 `hash.sip` 同时注册为裸名 `hash`) |
+
+> `SUM`/`AVG`/`COUNT` 的**函数形式**与**聚合子查询** `(SELECT SUM(col) FROM coll WHERE …)` 互不干扰:
+> 后者只在 `(SELECT …)` 上下文内解析,二者可共存于同一条规则。
+
+```
+规则: MATCH('price_')                                数据: {"price_usd":10}          → 命中
+规则: ARRAY_CONTAINS(MAPKEYS(attrs), 'vip_flag')     数据: {"attrs":{"vip_flag":1}}  → 命中
+规则: JMESPATH(orders, "[?status=='paid'].amount") IS NOT NULL
+      数据: {"orders":"[{\"amount\":120,\"status\":\"paid\"}]"}                      → 命中
+规则: USERAGENT(ua, 'mobile') = 'true'               数据: {"ua":"...iPhone..."}     → 命中
+规则: CAST(amount_str AS INT) >= 1000                数据: {"amount_str":"1,234"}    → 命中
+规则: TODATEIN('Asia/Shanghai', t) >= '2026-07-02 00:00:00'  数据: {"t":"2026-07-02 08:00:00"} → 命中
+```
+
+```
+规则: CONTAINS(name, '码')                          数据: {"name":"数码城"}            → 命中
+规则: STARTSWITH(phone, '139') AND vip_level >= 3   数据: {"phone":"13912345678","vip_level":4} → 命中
+规则: ARRAY_CONTAINS(SPLIT(csv, ','), 'b')          数据: {"csv":"a,b,c"}              → 命中
+规则: TOINT(amount_str) >= 1000                     数据: {"amount_str":"1,234"}       → 命中
+规则: EMAILDOMAIN(email) = 'example.com'            数据: {"email":"Bob@Example.com"}  → 命中
+规则: DAYOFWEEK(reg_date) = 4                       数据: {"reg_date":"2026-07-02"}    → 命中 (周四)
+规则: MD5(device_id) = '900150983cd24fb0d6963f7d28e17f72'  数据: {"device_id":"abc"}   → 命中
+```
+
+> **仍未对齐的 qlbridge 因子及原因**(经 2026-07-02 对 qlbridge 注册表 91 个可调用名逐一比对,
+> 其余已全部补齐):`map(k,v)/mapinvert/maptime`(构造/返回 map,引擎值栈无 map 类型;键值**读取**
+> 已由 `MAPKEYS`/`MAPVALUES` 覆盖)、`filter/filtermatch`(查询整形/字段投影,布尔用途已由 `MATCH`
+> 覆盖)、函数式 `any/all/exists/not`(与本语法的 `ANY`/`ALL`/`EXISTS`/`NOT` 关键字冲突,语义已由
+> 关键字覆盖)、`uuid`(随机值,规则求值需确定性)、`useragent.map`(返回 map;单项读取已由
+> `USERAGENT(ua, part)` 覆盖)。
 
 ---
 

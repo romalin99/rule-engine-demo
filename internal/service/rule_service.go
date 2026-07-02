@@ -16,6 +16,23 @@ import (
 	astrt "tcg-rulex-engine/pkg/runtime/ast"
 )
 
+// safeExplain wraps astrt.Explain with panic containment. Both the parsed
+// node (from untrusted rule text on /evaluate) and the row (untrusted on both
+// /evaluate and /evaluate/all) are external input, and Explain walks the tree
+// directly — a distinct eval boundary from the batch matchInto path. A
+// recovered panic reports as a non-pass with an explanatory reason, so one
+// hostile rule/row pair degrades to "did not match" instead of taking the
+// request goroutine (or, on the recover-less CLI path, the process) down.
+func safeExplain(node ir.Node, row map[string]any) (passed bool, reasons []astrt.Reason) {
+	defer func() {
+		if r := recover(); r != nil {
+			passed = false
+			reasons = []astrt.Reason{{Expr: ir.Emit(node, ir.SQL), Detail: fmt.Sprintf("evaluation error (recovered): %v", r)}}
+		}
+	}()
+	return astrt.Explain(node, row)
+}
+
 // flagshipRule is the full-operator-coverage rule used as the default for
 // Evaluate and SelfTest when the caller omits a rule.
 const flagshipRule = "age BETWEEN 25 AND 40 " +
@@ -137,7 +154,7 @@ func (s *RuleService) Evaluate(rule string, ruleID int64, row map[string]any) (p
 	if perr != nil {
 		return false, nil, ruleText, fmt.Errorf("parse: %w", perr)
 	}
-	passed, reasons = astrt.Explain(node, row)
+	passed, reasons = safeExplain(node, row)
 	if reasons == nil {
 		reasons = []astrt.Reason{}
 	}
@@ -188,7 +205,7 @@ func (s *RuleService) EvaluateAll(uid int64, row map[string]any) EvaluateAllResu
 			})
 			continue
 		}
-		ok, reasons := astrt.Explain(node, row)
+		ok, reasons := safeExplain(node, row)
 		if ok {
 			res.PassedRuleIDs = append(res.PassedRuleIDs, p.ID)
 			continue

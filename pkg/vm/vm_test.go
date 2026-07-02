@@ -302,8 +302,8 @@ func TestExplain(t *testing.T) {
 // CEIL/FLOOR), plus composition, function-on-both-sides, and NULL propagation.
 func TestFunctions(t *testing.T) {
 	cases := []struct {
-		rule string
 		row  map[string]any
+		rule string
 		want bool
 	}{
 		// string functions

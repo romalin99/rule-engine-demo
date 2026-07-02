@@ -3,10 +3,14 @@ package vm
 import (
 	"encoding/json"
 	"math"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"tcg-rulex-engine/pkg/sqlfn"
 )
 
 // stackMax bounds the evaluation stack depth. Boolean rule expressions are
@@ -16,8 +20,9 @@ const stackMax = 256
 
 // Eval runs the program against a row and returns its boolean result.
 //
-// The stack is a fixed-size local array, so Eval allocates nothing and is safe
-// for concurrent use from many goroutines (each call has its own stack). This is
+// The stack is a fixed-size local array, so Eval allocates nothing (except for
+// extended-builtin calls — OpCallB boxes its arguments) and is safe for
+// concurrent use from many goroutines (each call has its own stack). This is
 // what lets the worker pool share one *Program across all workers.
 func (p *Program) Eval(row map[string]any) bool {
 	var st [stackMax]Value
@@ -27,22 +32,16 @@ func (p *Program) Eval(row map[string]any) bool {
 		in := p.Code[i]
 		switch in.Op {
 
-		case OpLoadField, OpConstNum, OpConstStr, OpCurrentDate, OpCurrentTs: // push one value
+		case OpLoadField, OpConstNum, OpConstStr, OpCurrentDate, OpCurrentTs,
+			OpExistsSub, OpJSONField, OpAggSub, OpMatchPre, OpMapKeys, OpMapVals,
+			OpJmesField: // push one value (loads, consts and row-backed factors)
 			if sp >= stackMax {
 				return false
 			}
-			st[sp] = p.load(in, row)
+			st[sp] = p.pushValue(in, row)
 			sp++
 
-		case OpBetween: // pop hi,lo,x -> push lo <= x <= hi
-			if sp < 3 {
-				return false
-			}
-			x, lo, hi := st[sp-3], st[sp-2], st[sp-1]
-			sp -= 2
-			st[sp-1] = boolV(x.k == kNum && lo.k == kNum && hi.k == kNum && lo.n <= x.n && x.n <= hi.n)
-
-		case OpEq, OpNe, OpGt, OpGe, OpLt, OpLe, OpAnd, OpOr: // pop b,a -> push result
+		case OpEq, OpNe, OpGt, OpGe, OpLt, OpLe, OpAnd, OpOr: // pop b,a -> push bool
 			if sp < 2 {
 				return false
 			}
@@ -50,112 +49,56 @@ func (p *Program) Eval(row map[string]any) bool {
 			sp--
 			st[sp-1] = boolV(binaryOp(in.Op, a, b))
 
-		case OpIn, OpLikePrefix, OpLikeSuffix, OpLikeContains, OpLikeEq, OpIsNull, OpIsNotNull, OpNot, OpRegexp: // pop x -> push result
+		case OpIn, OpLikePrefix, OpLikeSuffix, OpLikeContains, OpLikeEq, OpIsNull, OpIsNotNull, OpNot, OpRegexp: // pop x -> push bool
 			if sp < 1 {
 				return false
 			}
 			st[sp-1] = boolV(p.unaryOp(in, st[sp-1]))
 
-		case OpUpper, OpLower, OpTrim, OpLength, OpAbs, OpRound, OpCeil, OpFloor, OpYear, OpMonth, OpDay, OpArrLen: // pop x -> push computed value
+		case OpUpper, OpLower, OpTrim, OpLength, OpAbs, OpRound, OpCeil, OpFloor,
+			OpYear, OpMonth, OpDay, OpArrLen: // pop x -> push computed value
 			if sp < 1 {
 				return false
 			}
 			st[sp-1] = callValue(in.Op, st[sp-1])
 
-		case OpSubstr: // pop s,start,len -> push substring
-			if sp < 3 {
-				return false
-			}
-			res := substr(st[sp-3], st[sp-2], st[sp-1])
-			sp -= 2
-			st[sp-1] = res
-
-		case OpDateDiff: // pop a,b -> push whole days (a - b)
-			if sp < 2 {
-				return false
-			}
-			d := dateDiff(st[sp-2], st[sp-1])
-			sp--
-			st[sp-1] = d
-
-		case OpArrContains: // pop arr,value -> bool
-			if sp < 2 {
-				return false
-			}
-			st[sp-2] = boolV(arrContains(st[sp-2], st[sp-1]))
-			sp--
-
-		case OpArrIntersect: // pop arr1,arr2 -> bool (non-empty intersection)
-			if sp < 2 {
-				return false
-			}
-			st[sp-2] = boolV(arrIntersect(st[sp-2], st[sp-1]))
-			sp--
-
-		case OpRound2: // pop x,d -> round x to d decimal places
-			if sp < 2 {
-				return false
-			}
-			st[sp-2] = round2(st[sp-2], st[sp-1])
-			sp--
-
-		case OpDateAdd2, OpDateSub2: // pop n,date -> date shifted by whole days
-			if sp < 2 {
-				return false
-			}
-			res := dateShift(st[sp-2], st[sp-1], "DAY", in.Op == OpDateSub2)
-			sp--
-			st[sp-1] = res
-
-		case OpDateAdd3, OpDateSub3: // pop unit,n,date -> date shifted by n units
-			if sp < 3 {
-				return false
-			}
-			res := dateShift(st[sp-3], st[sp-2], st[sp-1].asString(), in.Op == OpDateSub3)
-			sp -= 2
-			st[sp-1] = res
-
-		case OpQuantArr: // pop arr,left -> left op ANY/ALL of elements
-			if sp < 2 {
-				return false
-			}
-			res := quantArr(st[sp-2], st[sp-1], in.A)
-			sp--
-			st[sp-1] = boolV(res)
-
-		case OpExistsSub: // push EXISTS(collection)
-			if sp >= stackMax {
-				return false
-			}
-			st[sp] = boolV(p.existsSub(in.A, row))
-			sp++
-
-		case OpQuantSub: // pop left -> left op ANY/ALL of projected column
+		case OpQuantSub, OpJSONExpr, OpJmesExpr: // pop x -> push computed value (pool-backed)
 			if sp < 1 {
 				return false
 			}
-			st[sp-1] = boolV(p.quantSub(in.A, st[sp-1], row))
+			st[sp-1] = p.replaceValue(in, st[sp-1], row)
 
-		case OpJSONField: // push JSON scalar extracted from a field document
-			if sp >= stackMax {
+		case OpDateDiff, OpArrContains, OpArrIntersect, OpRound2, OpDateAdd2,
+			OpDateSub2, OpQuantArr: // pop b,a -> push f(a, b)
+			if sp < 2 {
 				return false
 			}
-			jo := p.JSONs[in.A]
-			st[sp] = jsonExtract(row[p.Fields[jo.FieldIdx]], jo.Path)
-			sp++
+			res := binaryValue(in, st[sp-2], st[sp-1])
+			sp--
+			st[sp-1] = res
 
-		case OpJSONExpr: // pop doc-string -> push JSON scalar
-			if sp < 1 {
+		case OpBetween, OpSubstr, OpDateAdd3, OpDateSub3: // pop c,b,a -> push f(a, b, c)
+			if sp < 3 {
 				return false
 			}
-			jo := p.JSONs[in.A]
-			st[sp-1] = jsonExtract(st[sp-1].asString(), jo.Path)
+			res := ternaryValue(in.Op, st[sp-3], st[sp-2], st[sp-1])
+			sp -= 2
+			st[sp-1] = res
 
-		case OpAggSub: // push aggregate scalar over a collection
-			if sp >= stackMax {
+		case OpCallB: // pop argc args -> push extended-builtin result
+			id, argc := in.A>>8, int(in.A&0xff)
+			b := sqlfn.ByID(id)
+			// The last term guards the argc == 0 push against a full stack; it
+			// is only evaluated once sp >= argc, so sp-argc is non-negative.
+			if b == nil || sp < argc || sp-argc >= stackMax {
 				return false
 			}
-			st[sp] = p.aggSub(in.A, row)
+			args := make([]any, argc)
+			for j := range argc {
+				args[j] = valueAny(st[sp-argc+j])
+			}
+			sp -= argc
+			st[sp] = toValue(b.Fn(args))
 			sp++
 
 		default:
@@ -167,6 +110,75 @@ func (p *Program) Eval(row map[string]any) bool {
 		return false
 	}
 	return st[0].b
+}
+
+// pushValue produces the value for every no-pop opcode: field loads and
+// constants (via load) plus the row-backed factors — EXISTS, JSON / JMESPath
+// field access, aggregate sub-queries, MATCH and MAPKEYS / MAPVALUES.
+func (p *Program) pushValue(in Instr, row map[string]any) Value {
+	switch in.Op {
+	case OpExistsSub:
+		return boolV(p.existsSub(in.A, row))
+	case OpJSONField:
+		jo := p.JSONs[in.A]
+		return jsonExtract(row[p.Fields[jo.FieldIdx]], jo.Path)
+	case OpAggSub:
+		return p.aggSub(in.A, row)
+	case OpMatchPre:
+		return boolV(matchPrefix(row, p.Strs[in.A]))
+	case OpMapKeys, OpMapVals:
+		return mapParts(row[p.Fields[in.A]], in.Op == OpMapVals)
+	case OpJmesField:
+		jo := p.JSONs[in.A]
+		return toValue(sqlfn.JmesEval(row[p.Fields[jo.FieldIdx]], jo.Path))
+	default: // OpLoadField, OpConstNum, OpConstStr, OpCurrentDate, OpCurrentTs
+		return p.load(in, row)
+	}
+}
+
+// replaceValue computes the pool-backed single-operand opcodes that replace
+// the top of stack: quantified sub-queries and the JSON / JMESPath document
+// operators.
+func (p *Program) replaceValue(in Instr, x Value, row map[string]any) Value {
+	switch in.Op {
+	case OpQuantSub: // left op ANY/ALL of a projected sub-query column
+		return boolV(p.quantSub(in.A, x, row))
+	case OpJSONExpr: // JSON scalar from a computed document string
+		return jsonExtract(x.asString(), p.JSONs[in.A].Path)
+	default: // OpJmesExpr: JMESPath result from a computed document string
+		return toValue(sqlfn.JmesEval(x.asString(), p.JSONs[in.A].Path))
+	}
+}
+
+// binaryValue computes a two-operand value opcode (pop b, a; push f(a, b)).
+func binaryValue(in Instr, a, b Value) Value {
+	switch in.Op {
+	case OpDateDiff: // whole days (a - b)
+		return dateDiff(a, b)
+	case OpArrContains: // b is an element of array a
+		return boolV(arrContains(a, b))
+	case OpArrIntersect: // arrays a and b share an element
+		return boolV(arrIntersect(a, b))
+	case OpRound2: // round a to b decimal places
+		return round2(a, b)
+	case OpQuantArr: // a op ANY/ALL of array b (op and ALL packed in in.A)
+		return boolV(quantArr(a, b, in.A))
+	default: // OpDateAdd2, OpDateSub2: date a shifted by b whole days
+		return dateShift(a, b, "DAY", in.Op == OpDateSub2)
+	}
+}
+
+// ternaryValue computes a three-operand value opcode (pop c, b, a; push
+// f(a, b, c)).
+func ternaryValue(op OpCode, a, b, c Value) Value {
+	switch op {
+	case OpBetween: // b <= a <= c (numeric)
+		return boolV(a.k == kNum && b.k == kNum && c.k == kNum && b.n <= a.n && a.n <= c.n)
+	case OpSubstr: // SUBSTRING(a, b, c)
+		return substr(a, b, c)
+	default: // OpDateAdd3, OpDateSub3: date a shifted by b units of c
+		return dateShift(a, b, c.asString(), op == OpDateSub3)
+	}
 }
 
 // load produces the value pushed by a load/const opcode (OpLoadField,
@@ -276,6 +288,11 @@ func callValue(op OpCode, x Value) Value {
 	if x.k == kUndef {
 		return undef
 	}
+	// Scalar functions have no meaning for an array operand: NULL, matching
+	// the AST runtime. LENGTH counts elements and OpArrLen requires an array.
+	if x.k == kArr && op != OpLength && op != OpArrLen {
+		return undef
+	}
 	switch op {
 	case OpUpper:
 		return strV(strings.ToUpper(x.asString()))
@@ -284,6 +301,11 @@ func callValue(op OpCode, x Value) Value {
 	case OpTrim:
 		return strV(strings.TrimSpace(x.asString()))
 	case OpLength:
+		// LENGTH of an array is its element count (qlbridge len semantics and
+		// the same answer as ARRAY_LENGTH); of anything else, the rune count.
+		if x.k == kArr {
+			return numV(float64(len(x.arr)))
+		}
 		return numV(float64(utf8.RuneCountInString(x.asString())))
 	case OpAbs:
 		if x.k != kNum {
@@ -330,11 +352,63 @@ func callValue(op OpCode, x Value) Value {
 	}
 }
 
+// matchPrefix reports whether any row field whose name starts with prefix
+// holds a non-null value (the MATCH predicate; qlbridge exists(match("k_"))).
+func matchPrefix(row map[string]any, prefix string) bool {
+	for k, v := range row {
+		if v != nil && strings.HasPrefix(k, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// mapParts renders a map field (a map[string]any or a JSON-object string) as
+// an array value: its sorted keys, or its values ordered by sorted key
+// (MAPKEYS / MAPVALUES). Keys are sorted because Go map iteration order is
+// random — rule results must be deterministic. Non-map input yields undef.
+func mapParts(raw any, wantValues bool) Value {
+	m, ok := jsonRoot(raw).(map[string]any)
+	if !ok {
+		return undef
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	if !wantValues {
+		return arrV(keys)
+	}
+	vals := make([]string, len(keys))
+	for i, k := range keys {
+		vals[i] = toValue(m[k]).asString()
+	}
+	return arrV(vals)
+}
+
+// valueAny converts a VM stack value to the extended-builtin value model
+// (pkg/sqlfn): nil / float64 / string / bool / []string.
+func valueAny(v Value) any {
+	switch v.k {
+	case kNum:
+		return v.n
+	case kStr:
+		return v.s
+	case kBool:
+		return v.b
+	case kArr:
+		return v.arr
+	default:
+		return nil
+	}
+}
+
 // substr implements SQL SUBSTRING(s, start, length): 1-indexed and rune-based,
 // with out-of-range start/length clamped to the empty string. A NULL input or
 // non-numeric start/length yields undef.
 func substr(s, start, length Value) Value {
-	if s.k == kUndef || start.k != kNum || length.k != kNum {
+	if s.k == kUndef || s.k == kArr || start.k != kNum || length.k != kNum {
 		return undef
 	}
 	rs := []rune(s.asString())
@@ -346,11 +420,14 @@ func substr(s, start, length Value) Value {
 	if from >= len(rs) || count <= 0 {
 		return strV("")
 	}
-	to := from + count
-	if to > len(rs) {
-		to = len(rs)
+	// Clamp count BEFORE adding: with a near-MaxInt64 literal length,
+	// from+count would overflow to a negative slice bound and panic — and a
+	// panic inside Eval kills the whole worker process. After the clamp,
+	// from+count <= len(rs) by construction.
+	if count > len(rs)-from {
+		count = len(rs) - from
 	}
-	return strV(string(rs[from:to]))
+	return strV(string(rs[from : from+count]))
 }
 
 const (
@@ -396,12 +473,7 @@ func arrContains(arr, v Value) bool {
 		return false
 	}
 	vs := v.asString()
-	for _, e := range arr.arr {
-		if e == vs {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(arr.arr, vs)
 }
 
 // arrIntersect reports whether two array values share at least one element
@@ -539,12 +611,7 @@ func (p *Program) existsSub(idx int32, row map[string]any) bool {
 	if s.Where == nil {
 		return collLen(row[s.Coll]) > 0
 	}
-	for _, nr := range asRows(row[s.Coll]) {
-		if s.Where.Eval(nr) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(asRows(row[s.Coll]), s.Where.Eval)
 }
 
 // quantSub evaluates `left <op> ANY/ALL (SELECT col FROM coll [WHERE pred])`,

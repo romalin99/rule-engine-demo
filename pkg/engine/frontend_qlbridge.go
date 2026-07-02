@@ -31,10 +31,11 @@ func (QLBridgeFrontend) Name() string { return "qlbridge" }
 // Parse parses with qlbridge then converts the AST to IR, falling back to the
 // native parser for anything qlbridge cannot parse or convert.
 func (QLBridgeFrontend) Parse(rule string) (ir.Node, error) {
-	node, err := expr.ParseExpression(rule)
+	node, err := safeQLParse(rule)
 	if err != nil {
 		// qlbridge cannot lex/parse this construct (functions it rejects, IS NULL,
-		// EXISTS, REGEXP, JSON accessors, …). Defer to the native SQL parser.
+		// EXISTS, REGEXP, JSON accessors, …) — or its parser panicked on hostile
+		// text. Defer to the native SQL parser either way.
 		return ir.Parse(rule)
 	}
 	irNode, err := qlToIR(node)
@@ -45,6 +46,19 @@ func (QLBridgeFrontend) Parse(rule string) (ir.Node, error) {
 		return ir.Parse(rule)
 	}
 	return irNode, nil
+}
+
+// safeQLParse invokes qlbridge's parser with panic containment. Rule text can
+// come from tenant UIs; a third-party parser panic on malformed input must
+// surface as an error (triggering the native fallback, which has its own
+// strict error handling and nesting bound) rather than crash the process.
+func safeQLParse(rule string) (node expr.Node, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			node, err = nil, fmt.Errorf("qlbridge parser panic: %v", r)
+		}
+	}()
+	return expr.ParseExpression(rule)
 }
 
 // qlToIR converts a qlbridge AST node into the project IR.

@@ -57,6 +57,12 @@ SQL / 表达式 / CEL / JSON，统一编译成字节码，由一个自研 VM 对
 核心思想：**parser 只负责解析，求值永远走同一个字节码 VM**。qlbridge 在这里只是
 front-end 之一，不参与业务求值。
 
+> ⚠️ **前端 / 运行时能力并不对等**:7 类高级 SQL 特性(字符串/日期/数学/集合/数组/JSON/正则)
+> 目前**只在 `bytecode` 与 `ast` 运行时上完整可用**,且只有 **native SQL 前端**能完整表达;
+> `JSON / CEL / Expr` 前端与 `qlbridge / CEL / Expr` 运行时为基础谓词子集。完整支持矩阵见
+> [docs/architecture.md](docs/architecture.md#支持矩阵-support-matrix) 与
+> [docs/sql_feature_audit.md](docs/sql_feature_audit.md)。
+
 ---
 
 ## 🚀 Quick start
@@ -198,13 +204,23 @@ go run  cmd/api/main.go -rules data/rules.json -users data/users.json -frontend 
 
 | 类别   | 函数                                                              |
 | ------ | ----------------------------------------------------------------- |
-| 字符串 | `LOWER` `UPPER` `TRIM` `LENGTH` `SUBSTRING`/`SUBSTR`               |
-| 数学   | `ABS` `ROUND` `CEIL`/`CEILING` `FLOOR`                            |
-| 日期   | `CURRENT_DATE` `CURRENT_TIMESTAMP` `YEAR` `MONTH` `DAY` `DATEDIFF` `DATE_ADD` `DATE_SUB` |
-| 数组   | `ARRAY_LENGTH` `ARRAY_CONTAINS` `ARRAY_OVERLAP`                    |
-| 集合   | `EXISTS` `ANY`/`SOME` `ALL`（量词 + 行内子查询）；标量聚合 `COUNT/SUM/MIN/MAX/AVG` |
+| 字符串 | `LOWER` `UPPER` `TRIM` `LENGTH` `SUBSTRING`/`SUBSTR`；扩展:`TOLOWER` `TOUPPER` `STRIP` `CHAR_LENGTH` `REPLACE` `SPLIT` `JOIN` `CONCAT` `STRING_INDEX` `TITLECASE`、谓词 `CONTAINS` `STARTSWITH`/`HASPREFIX` `ENDSWITH`/`HASSUFFIX` |
+| 数学   | `ABS` `ROUND` `CEIL`/`CEILING` `FLOOR`；扩展:`SQRT` `POW`/`POWER`、转换 `TOINT` `TONUMBER` `TOBOOL` `TOSTRING` `UNSIGN`、`ONEOF`/`COALESCE`、函数式比较 `EQ/NE/GT/GE/LT/LE`、函数式聚合 `SUM/AVG/COUNT` |
+| 日期   | `CURRENT_DATE` `CURRENT_TIMESTAMP` `YEAR` `MONTH` `DAY` `DATEDIFF` `DATE_ADD` `DATE_SUB`；扩展:`NOW()` `TODATE` `TOTIMESTAMP`/`UNIX_TIMESTAMP` `HOUR` `MINUTE` `SECOND` `DAYOFWEEK` `HOUROFDAY` `HOUROFWEEK` `MONTHOFYEAR` `YY` `MM` `YYMM` `SECONDS` `UNIXTRUNC` |
+| 数组   | `ARRAY_LENGTH` `ARRAY_CONTAINS` `ARRAY_OVERLAP` `ARRAY_INTERSECT`；扩展:`ARRAY_INDEX` `ARRAY_SLICE`（可与 `SPLIT` 组合） |
+| 集合   | `EXISTS` `ANY`/`SOME` `ALL`（量词 + 行内子查询 + **计算数组**：`tag = ANY(SPLIT(csv,','))`）；标量聚合 `COUNT/SUM/MIN/MAX/AVG` |
 | JSON   | `JSON_EXTRACT`/`JSON_VALUE`（`$.a.b[0]` 路径，取标量）             |
-| 正则   | `x REGEXP 'p'`/`RLIKE`、`REGEXP_LIKE(x,'p'[,'i'])`（RE2）          |
+| 正则   | `x REGEXP 'p'`/`RLIKE`、`REGEXP_LIKE(x,'p'[,match_type])`（RE2；标志 `i/c/m/n/u`，最右 i/c 生效） |
+| 网络   | 扩展:`EMAIL` `EMAILNAME` `EMAILDOMAIN`、`HOST` `DOMAIN` `PATH`/`URLPATH` `QS`/`QS2` `URLDECODE` `URLMAIN` `URLMINUSQS` `URL_MATCHQS` `DOMAINS` `HOSTS`、`USERAGENT` |
+| 摘要   | 扩展:`MD5` `SHA1` `SHA256` `SHA512`（及 `HASH_*` 别名）、`HASH`/`HASH_SIP`/`SIPHASH`、`B64ENCODE` `B64DECODE` |
+| 其他   | 扩展:`CAST(x AS 类型)`、`MATCH('前缀')` 行级字段匹配、`MAPKEYS`/`MAPVALUES`、`JMESPATH`（完整 JMESPath 查询）、`TODATEIN`（时区）、`STRFTIME`/`EXTRACT` |
+
+> “扩展”指与 [qlbridge](https://github.com/araddon/qlbridge) 内置计算因子对齐的函数库
+> （`pkg/sqlfn`，bytecode 与 ast 两套运行时同实现），见 [docs/functions.md §5.8](docs/functions.md)。
+>
+> 安全：规则文本与行数据均按不可信输入处理——解析深度上限、求值 panic 遏制（`EvalPanics()`
+> 可观测）、RE2 无回溯正则、缓存有界、fail-safe 语义。逐特性风险矩阵见
+> [docs/security_review.md](docs/security_review.md)。
 
 ```sql
 LOWER(name) = 'abc'                         -- 字符串

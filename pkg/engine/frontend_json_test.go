@@ -7,11 +7,40 @@
 package engine_test
 
 import (
+	"strings"
 	"testing"
 
 	"tcg-rulex-engine/pkg/engine"
 	"tcg-rulex-engine/pkg/model"
 )
+
+// TestJSONFrontendDepthLimit locks in the round-eight fix: a deeply nested
+// JSON rule must fail at load with a clean error, not overflow the goroutine
+// stack (unrecoverable). The native SQL parser has the same bound; both
+// entry-point-reachable frontends are now guarded.
+func TestJSONFrontendDepthLimit(t *testing.T) {
+	fe := engine.JSONFrontend{}
+
+	// 600 nested {"not": …} wrappers around a leaf: well past the 200 bound.
+	deep := strings.Repeat(`{"not":`, 600) + `{"field":"x","op":"=","value":1}` + strings.Repeat("}", 600)
+	if _, err := fe.Parse(deep); err == nil {
+		t.Error("expected depth error for 600 nested JSON nodes")
+	} else if !strings.Contains(err.Error(), "deeply") {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Nested and-arrays hit the same guard.
+	and := strings.Repeat(`{"and":[`, 600) + `{"field":"x","op":"=","value":1}` + strings.Repeat("]}", 600)
+	if _, err := fe.Parse(and); err == nil {
+		t.Error("expected depth error for 600 nested and-arrays")
+	}
+
+	// A modestly nested rule still parses fine (well under the bound).
+	ok := strings.Repeat(`{"not":`, 50) + `{"field":"x","op":"=","value":1}` + strings.Repeat("}", 50)
+	if _, err := fe.Parse(ok); err != nil {
+		t.Errorf("50-deep JSON rule should parse: %v", err)
+	}
+}
 
 func TestJSONFrontend(t *testing.T) {
 	jsonRule := `{
@@ -67,8 +96,11 @@ func TestJSONFrontendDateBetween(t *testing.T) {
 		val  string
 		want bool
 	}{
-		{"2020-06-15", true}, {"2020-01-01", true}, {"2020-12-31", true},
-		{"2019-12-31", false}, {"2021-01-01", false},
+		{"2020-06-15", true},
+		{"2020-01-01", true},
+		{"2020-12-31", true},
+		{"2019-12-31", false},
+		{"2021-01-01", false},
 	} {
 		u := model.User{UID: 1, Fields: map[string]any{"reg_date": tc.val}}
 		gj := len(jf.Match(u)) == 1

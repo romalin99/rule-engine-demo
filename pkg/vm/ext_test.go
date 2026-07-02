@@ -47,9 +47,9 @@ func TestExtDateAndSetPredicates(t *testing.T) {
 		{"maxv < ANY(scores)", row, false}, // 95 < none
 		{"minv <= ALL(scores)", row, false},
 		{"lo <= ALL(scores)", row, true},
-		{"need = ANY(scores)", row, true}, // 85 in {70,85,92}
-		{"minv < ANY(scores)", empty, false},  // ANY over an empty/missing set -> false
-		{"minv <= ALL(scores)", empty, true},  // ALL over an empty/missing set -> vacuously true
+		{"need = ANY(scores)", row, true},    // 85 in {70,85,92}
+		{"minv < ANY(scores)", empty, false}, // ANY over an empty/missing set -> false
+		{"minv <= ALL(scores)", empty, true}, // ALL over an empty/missing set -> vacuously true
 
 		// ---- ANY / ALL over a value list (desugared) ----
 		{"prov = ANY('A','B','C')", row, true},
@@ -229,10 +229,10 @@ func TestExtJSONAndRegexp(t *testing.T) {
 		// ---- JSON_EXTRACT over a JSON-string field ----
 		{"JSON_EXTRACT(profile, '$.city') = '深圳'", row, true},
 		{"JSON_EXTRACT(profile, '$.city') = '上海'", row, false},
-		{"JSON_EXTRACT(profile, '$.age') = 30", row, true},   // number
+		{"JSON_EXTRACT(profile, '$.age') = 30", row, true}, // number
 		{"JSON_EXTRACT(profile, '$.age') > 18", row, true},
-		{"JSON_EXTRACT(profile, '$.vip') = 'true'", row, true}, // bool -> "true"
-		{"JSON_EXTRACT(profile, '$.tags[1]') = 'b'", row, true}, // array index
+		{"JSON_EXTRACT(profile, '$.vip') = 'true'", row, true},        // bool -> "true"
+		{"JSON_EXTRACT(profile, '$.tags[1]') = 'b'", row, true},       // array index
 		{"JSON_EXTRACT(profile, '$.addr.zip') = '518000'", row, true}, // nested
 		{"JSON_EXTRACT(profile, '$.missing') IS NULL", row, true},
 		{"JSON_VALUE(profile, '$.city') = '深圳'", row, true}, // alias
@@ -249,7 +249,7 @@ func TestExtJSONAndRegexp(t *testing.T) {
 		{"name NOT REGEXP '^Bob'", row, true},
 		{"code REGEXP '^[A-Z]+-[0-9]+$'", row, true},
 		{"phone REGEXP '^139'", row, true},
-		{"missing REGEXP '.*'", row, false},    // NULL never matches
+		{"missing REGEXP '.*'", row, false}, // NULL never matches
 		{"missing NOT REGEXP '.*'", row, true},
 		// ---- REGEXP_LIKE (function form, optional 'i' flag) ----
 		{"REGEXP_LIKE(name, 'alice')", row, false},     // case-sensitive

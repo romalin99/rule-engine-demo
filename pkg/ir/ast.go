@@ -95,8 +95,8 @@ type CallTerm struct {
 // predicates such as `LOWER(name) = 'abc'` or `ABS(balance) >= 100`.
 type CompareTerm struct {
 	Left  Term
-	Op    string
 	Right Term
+	Op    string
 }
 
 // LikeTerm is `<term> LIKE 'pattern'` (Negate = NOT LIKE): the function-aware
@@ -138,10 +138,10 @@ type Regexp struct {
 // Term it can sit on either side of a comparison, e.g.
 // `(SELECT COUNT(*) FROM orders WHERE amount > 100) > 3`.
 type AggSub struct {
+	Where Node
 	Fn    string
 	Col   string
 	Coll  string
-	Where Node
 }
 
 func (FieldTerm) term() {}
@@ -167,8 +167,8 @@ func (PredCall) node()    {}
 // predicate is evaluated against each nested row (its identifiers resolve to the
 // nested row's fields). `NOT EXISTS(...)` is represented with a wrapping Not.
 type Exists struct {
+	Where Node
 	Coll  string
-	Where Node // nil = non-empty test; non-nil = ∃ nested row satisfying it
 }
 
 // QuantArr is `<left> <op> ANY|ALL ( arrayField )`: compare Left against every
@@ -176,9 +176,9 @@ type Exists struct {
 // An empty/absent array makes ANY false and ALL true (SQL semantics).
 type QuantArr struct {
 	Left  Term
+	Array Term
 	Op    string
 	All   bool
-	Array Term // a FieldTerm referencing the array field
 }
 
 // QuantSub is `<left> <op> ANY|ALL ( SELECT col FROM coll [WHERE pred] )`:
@@ -187,11 +187,11 @@ type QuantArr struct {
 // All=true is ALL (∀); an empty result set makes ANY false and ALL true.
 type QuantSub struct {
 	Left  Term
+	Where Node
 	Op    string
-	All   bool
 	Col   string
 	Coll  string
-	Where Node // nil = no WHERE (all nested rows considered)
+	All   bool
 }
 
 func (Exists) node()   {}

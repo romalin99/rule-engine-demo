@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -21,6 +22,7 @@ import (
 
 	"tcg-rulex-engine/pkg/api"
 	"tcg-rulex-engine/pkg/ir"
+	"tcg-rulex-engine/pkg/sqlfn"
 )
 
 // Runtime implements api.Runtime by walking the IR tree.
@@ -92,18 +94,27 @@ func eval(n ir.Node, row map[string]any) (bool, error) {
 		return f >= lo && f <= hi, nil
 
 	case ir.In:
-		s := asString(row[t.Field])
+		// NULL is never IN any list (mirrors the VM, which rejects kUndef even
+		// when the list contains '' — asString(nil) would otherwise match it).
 		in := false
-		for _, v := range t.Vals {
-			if s == litString(v) {
-				in = true
-				break
+		if raw, present := row[t.Field]; present && raw != nil {
+			s := asString(raw)
+			for _, v := range t.Vals {
+				if s == litString(v) {
+					in = true
+					break
+				}
 			}
 		}
 		return in != t.Negate, nil // NOT IN flips membership
 
 	case ir.Like:
-		m := like(asString(row[t.Field]), t.Pattern)
+		// NULL never matches a LIKE pattern (mirrors the VM's kUndef guard;
+		// asString(nil)="" would otherwise match '%' / '' patterns).
+		m := false
+		if raw, present := row[t.Field]; present && raw != nil {
+			m = like(asString(raw), t.Pattern)
+		}
 		return m != t.Negate, nil // NOT LIKE flips the match
 
 	case ir.IsNull:
@@ -290,8 +301,12 @@ func jsonExtractAST(args []ir.Term, row map[string]any) any {
 	var raw any
 	if ft, ok := args[0].(ir.FieldTerm); ok {
 		raw = row[ft.Name] // raw value: JSON string or parsed object
-	} else {
-		raw = evalTerm(args[0], row)
+	} else if v := evalTerm(args[0], row); v != nil {
+		// A computed document is rendered to text first, exactly like the VM's
+		// OpJSONExpr (which consumes the stack value via asString) and like
+		// jmesAST below — so numeric/boolean expression results parse as JSON
+		// scalars on both runtimes instead of NULLing here only.
+		raw = valStr(v)
 	}
 	root := jsonRoot(raw)
 	if root == nil {
@@ -566,13 +581,22 @@ func aggSubAST(t ir.AggSub, row map[string]any) any {
 }
 
 // termVal normalizes a raw row value like the VM's toValue: numerics become
-// float64, strings stay strings, and anything else (nil/bool/unknown) is NULL.
+// float64, strings stay strings, and BOOLEANS stay booleans — the VM keeps
+// them as a kBool value that renders "true"/"false" in string contexts, and
+// valStr does the same here, so `is_vip = is_active`, `UPPER(flag)`,
+// `flag REGEXP 'tr'` and quantifier projections agree across runtimes.
+// (Nilling booleans, as this used to do, made every term-based path treat a
+// bool field as NULL on the AST runtime only.) Anything else — nil, arrays,
+// nested objects — is NULL for scalar term contexts.
 func termVal(raw any) any {
 	if f, ok := toNum(raw); ok {
 		return f
 	}
-	if s, ok := raw.(string); ok {
-		return s
+	switch x := raw.(type) {
+	case string:
+		return x
+	case bool:
+		return x
 	}
 	return nil
 }
@@ -581,6 +605,12 @@ func termVal(raw any) any {
 // NULL operands propagate, math functions require a numeric operand, and a
 // wrong argument count yields NULL.
 func applyFunc(fn string, args []ir.Term, row map[string]any) any {
+	// Extended builtins (pkg/sqlfn) — their names never overlap the core
+	// switch below. Arguments use argVal, which preserves array and boolean
+	// field values that termVal deliberately nils for the legacy paths.
+	if b, ok := sqlfn.Lookup(fn); ok {
+		return applyBuiltin(b, args, row)
+	}
 	vals := make([]any, len(args))
 	for i, a := range args {
 		vals[i] = evalTerm(a, row)
@@ -599,29 +629,13 @@ func applyFunc(fn string, args []ir.Term, row map[string]any) any {
 			return strings.TrimSpace(s)
 		}
 	case "LENGTH", "LEN":
-		if s, ok := strOperand(vals); ok {
-			return float64(utf8.RuneCountInString(s))
-		}
+		return lengthAST(args, vals, row)
 	case "ABS":
 		if f, ok := numOperand(vals); ok {
 			return math.Abs(f)
 		}
 	case "ROUND":
-		// ROUND(x, d) rounds to d decimal places; ROUND(x) to the nearest integer.
-		if len(vals) == 2 {
-			x, xok := vals[0].(float64)
-			d, dok := vals[1].(float64)
-			if xok && dok {
-				pow := math.Pow(10, d)
-				if pow != 0 && !math.IsInf(pow, 0) {
-					return math.Round(x*pow) / pow
-				}
-			}
-			return nil
-		}
-		if f, ok := numOperand(vals); ok {
-			return math.Round(f)
-		}
+		return roundAST(vals)
 	case "CEIL", "CEILING":
 		if f, ok := numOperand(vals); ok {
 			return math.Ceil(f)
@@ -660,12 +674,70 @@ func applyFunc(fn string, args []ir.Term, row map[string]any) any {
 		return dateShiftAST(fn, vals)
 	case "JSON_EXTRACT", "JSON_VALUE":
 		return jsonExtractAST(args, row)
+	case "JMESPATH", "JSON_JMESPATH":
+		return jmesAST(args, row)
+	case "MAPKEYS":
+		return mapPartsAST(args, row, false)
+	case "MAPVALUES":
+		return mapPartsAST(args, row, true)
 	case "ARRAY_LENGTH":
 		if len(args) == 1 {
 			if arr := arrayOf(args[0], row); arr != nil {
 				return float64(len(arr))
 			}
 		}
+	}
+	return nil
+}
+
+// applyBuiltin evaluates an extended builtin (pkg/sqlfn): arity is validated,
+// then arguments are evaluated with argVal (array/boolean preserving).
+func applyBuiltin(b *sqlfn.Builtin, args []ir.Term, row map[string]any) any {
+	if !b.ArityOK(len(args)) {
+		return nil
+	}
+	av := make([]any, len(args))
+	for i, a := range args {
+		av[i] = argVal(a, row)
+	}
+	return b.Fn(av)
+}
+
+// lengthAST implements LENGTH / LEN: the element count of an array operand
+// (same answer as ARRAY_LENGTH and the bytecode VM), else the rune count.
+func lengthAST(args []ir.Term, vals []any, row map[string]any) any {
+	if len(args) == 1 {
+		if xs, ok := vals[0].([]string); ok { // computed array (e.g. SPLIT)
+			return float64(len(xs))
+		}
+		if ft, ok := args[0].(ir.FieldTerm); ok { // array field
+			if xs := toStringSlice(row[ft.Name]); xs != nil {
+				return float64(len(xs))
+			}
+		}
+	}
+	if s, ok := strOperand(vals); ok {
+		return float64(utf8.RuneCountInString(s))
+	}
+	return nil
+}
+
+// roundAST implements ROUND: ROUND(x, d) rounds to d decimal places (d may be
+// negative); ROUND(x) rounds to the nearest integer. Mirrors the VM's round2.
+func roundAST(vals []any) any {
+	if len(vals) == 2 {
+		x, xok := vals[0].(float64)
+		d, dok := vals[1].(float64)
+		if xok && dok {
+			pow := math.Pow(10, d)
+			if pow != 0 && !math.IsInf(pow, 0) {
+				return math.Round(x*pow) / pow
+			}
+		}
+		return nil
+	}
+	if f, ok := numOperand(vals); ok {
+		return math.Round(f)
 	}
 	return nil
 }
@@ -779,10 +851,7 @@ func substrAST(vals []any) any {
 		return nil
 	}
 	rs := []rune(valStr(vals[0]))
-	from := int(start) - 1
-	if from < 0 {
-		from = 0
-	}
+	from := max(int(start)-1, 0)
 	count := len(rs) // 2-arg SUBSTRING(s, start): to the end of the string
 	if len(vals) == 3 {
 		length, lok := vals[2].(float64)
@@ -794,11 +863,12 @@ func substrAST(vals []any) any {
 	if from >= len(rs) || count <= 0 {
 		return ""
 	}
-	to := from + count
-	if to > len(rs) {
-		to = len(rs)
+	// Clamp BEFORE adding — from+count may overflow int64 for huge length
+	// literals, and a negative slice bound panics (see the VM's substr).
+	if count > len(rs)-from {
+		count = len(rs) - from
 	}
-	return string(rs[from:to])
+	return string(rs[from : from+count])
 }
 
 // valStr renders a normalized value (float64 or string) as text.
@@ -808,6 +878,13 @@ func valStr(v any) string {
 		return x
 	case float64:
 		return strconv.FormatFloat(x, 'f', -1, 64)
+	case bool:
+		// mirror the VM's Value.asString so boolean-valued functions (TOBOOL,
+		// EQ, CONTAINS, ...) compare identically on both runtimes
+		if x {
+			return "true"
+		}
+		return "false"
 	}
 	return ""
 }
@@ -877,10 +954,30 @@ func parseDateAST(s string) (time.Time, bool) {
 	return time.Time{}, false
 }
 
-// evalPred evaluates a boolean-valued array predicate (ARRAY_CONTAINS /
-// ARRAY_INTERSECT), mirroring the bytecode VM. Array operands must be field
-// references.
+// evalPred evaluates a boolean-valued predicate function: the array predicates
+// (ARRAY_CONTAINS / ARRAY_INTERSECT) and the extended boolean builtins
+// (pkg/sqlfn: CONTAINS / STARTSWITH / GT / ...), mirroring the bytecode VM.
 func evalPred(fn string, args []ir.Term, row map[string]any) bool {
+	// MATCH('prefix', ...): true when some row field named with one of the
+	// prefixes holds a non-null value (mirrors the VM's OpMatchPre).
+	if fn == "MATCH" {
+		for _, a := range args {
+			lit, ok := a.(ir.LitTerm)
+			if !ok || !lit.Val.IsString || lit.Val.Str == "" {
+				return false
+			}
+			for k, v := range row {
+				if v != nil && strings.HasPrefix(k, lit.Val.Str) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if bi, ok := sqlfn.Lookup(fn); ok && bi.Bool {
+		b, _ := applyBuiltin(bi, args, row).(bool)
+		return b
+	}
 	if len(args) < 1 {
 		return false
 	}
@@ -897,14 +994,33 @@ func evalPred(fn string, args []ir.Term, row map[string]any) bool {
 	return false
 }
 
-// arrayOf reads the array referenced by a field term, or nil when t is not a
-// field or the field does not hold an array.
-func arrayOf(t ir.Term, row map[string]any) []string {
-	ft, ok := t.(ir.FieldTerm)
-	if !ok {
-		return nil
+// argVal evaluates a term for the extended-builtin (pkg/sqlfn) argument model:
+// like evalTerm, but additionally preserving ARRAY field values, which termVal
+// nils for the scalar term paths (booleans pass through termVal itself).
+func argVal(t ir.Term, row map[string]any) any {
+	if ft, ok := t.(ir.FieldTerm); ok {
+		raw := row[ft.Name]
+		if xs := toStringSlice(raw); xs != nil {
+			return xs
+		}
+		return termVal(raw)
 	}
-	return toStringSlice(row[ft.Name])
+	return evalTerm(t, row)
+}
+
+// arrayOf reads the array produced by a term: a field holding an array, or a
+// function call returning one (e.g. SPLIT). nil when the term is neither.
+func arrayOf(t ir.Term, row map[string]any) []string {
+	switch x := t.(type) {
+	case ir.FieldTerm:
+		return toStringSlice(row[x.Name])
+	case ir.CallTerm:
+		// computed arrays compose with the array predicates, e.g.
+		// ARRAY_CONTAINS(SPLIT(csv, ','), 'x')
+		xs, _ := applyFunc(x.Fn, x.Args, row).([]string)
+		return xs
+	}
+	return nil
 }
 
 // toStringSlice renders an array field value as []string, mirroring the VM's
@@ -916,20 +1032,72 @@ func toStringSlice(raw any) []string {
 	case []any:
 		out := make([]string, len(x))
 		for i, e := range x {
-			out[i] = valStr(termVal(e))
+			out[i] = rawText(e)
 		}
 		return out
 	}
 	return nil
 }
 
-func sliceContains(arr []string, v string) bool {
-	for _, e := range arr {
-		if e == v {
-			return true
-		}
+// rawText renders a raw row value as text exactly like the VM's
+// toValue(...).asString(): numbers without trailing zeros, booleans as
+// "true"/"false" (termVal passes them through, valStr renders them),
+// nested composites as "".
+func rawText(v any) string {
+	return valStr(termVal(v))
+}
+
+// jmesAST evaluates JMESPATH / JSON_JMESPATH(doc, 'expr'), reading a field
+// document raw (a JSON string or a pre-parsed object) like jsonExtractAST;
+// any other document expression is rendered to a string first.
+func jmesAST(args []ir.Term, row map[string]any) any {
+	if len(args) != 2 {
+		return nil
 	}
-	return false
+	lit, ok := args[1].(ir.LitTerm)
+	if !ok || !lit.Val.IsString {
+		return nil
+	}
+	var doc any
+	if ft, ok := args[0].(ir.FieldTerm); ok {
+		doc = row[ft.Name]
+	} else if v := evalTerm(args[0], row); v != nil {
+		doc = valStr(v)
+	}
+	return sqlfn.JmesEval(doc, lit.Val.Str)
+}
+
+// mapPartsAST mirrors the VM's mapParts: the sorted keys — or the values
+// ordered by sorted key — of a map (or JSON-object string) field, as []string.
+func mapPartsAST(args []ir.Term, row map[string]any, wantValues bool) any {
+	if len(args) != 1 {
+		return nil
+	}
+	ft, ok := args[0].(ir.FieldTerm)
+	if !ok {
+		return nil
+	}
+	m, ok := jsonRoot(row[ft.Name]).(map[string]any)
+	if !ok {
+		return nil
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	if !wantValues {
+		return keys
+	}
+	vals := make([]string, len(keys))
+	for i, k := range keys {
+		vals[i] = rawText(m[k])
+	}
+	return vals
+}
+
+func sliceContains(arr []string, v string) bool {
+	return slices.Contains(arr, v)
 }
 
 // sliceIntersect reports whether two string slices share at least one element

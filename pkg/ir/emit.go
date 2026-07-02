@@ -54,9 +54,9 @@ func emitSQL(n Node) string {
 		return t.Field + " IN (" + sqlValList(t.Vals) + ")"
 	case Like:
 		if t.Negate {
-			return t.Field + " NOT LIKE '" + t.Pattern + "'"
+			return t.Field + " NOT LIKE " + sqlStr(t.Pattern)
 		}
-		return t.Field + " LIKE '" + t.Pattern + "'"
+		return t.Field + " LIKE " + sqlStr(t.Pattern)
 	case IsNull:
 		if t.Negate {
 			return t.Field + " IS NOT NULL"
@@ -68,9 +68,9 @@ func emitSQL(n Node) string {
 		return emitTermSQL(t.Left) + " " + t.Op + " " + emitTermSQL(t.Right)
 	case LikeTerm:
 		if t.Negate {
-			return emitTermSQL(t.Left) + " NOT LIKE '" + t.Pattern + "'"
+			return emitTermSQL(t.Left) + " NOT LIKE " + sqlStr(t.Pattern)
 		}
-		return emitTermSQL(t.Left) + " LIKE '" + t.Pattern + "'"
+		return emitTermSQL(t.Left) + " LIKE " + sqlStr(t.Pattern)
 	case IsNullTerm:
 		if t.Negate {
 			return emitTermSQL(t.Left) + " IS NOT NULL"
@@ -97,9 +97,9 @@ func emitSQL(n Node) string {
 		return emitTermSQL(t.Left) + " " + t.Op + " " + quantKind(t.All) + " (" + sub + ")"
 	case Regexp:
 		if t.Negate {
-			return emitTermSQL(t.Left) + " NOT REGEXP '" + t.Pattern + "'"
+			return emitTermSQL(t.Left) + " NOT REGEXP " + sqlStr(t.Pattern)
 		}
-		return emitTermSQL(t.Left) + " REGEXP '" + t.Pattern + "'"
+		return emitTermSQL(t.Left) + " REGEXP " + sqlStr(t.Pattern)
 	}
 	return ""
 }
@@ -146,9 +146,31 @@ func wrapSQL(n Node) string {
 	return emitSQL(n)
 }
 
+// sqlStr renders a string value as a single-quoted SQL literal, escaping
+// backslashes and single quotes so the output re-parses to the same value
+// (the lexer unescapes exactly \' \" \\). Without this, a value containing a
+// quote (O'Brien) or a trailing backslash would break the emit→parse round
+// trip that the decision-table path (row → IR → SQL → reparse) relies on.
+func sqlStr(s string) string {
+	if !strings.ContainsAny(s, `\'`) {
+		return "'" + s + "'"
+	}
+	var sb strings.Builder
+	sb.Grow(len(s) + 2)
+	sb.WriteByte('\'')
+	for _, r := range s {
+		if r == '\\' || r == '\'' {
+			sb.WriteByte('\\')
+		}
+		sb.WriteRune(r)
+	}
+	sb.WriteByte('\'')
+	return sb.String()
+}
+
 func sqlVal(v Value) string {
 	if v.IsString {
-		return "'" + v.Str + "'"
+		return sqlStr(v.Str)
 	}
 	return v.Num
 }
