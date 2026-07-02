@@ -7,11 +7,40 @@
 package engine_test
 
 import (
+	"strings"
 	"testing"
 
 	"tcg-rulex-engine/pkg/engine"
 	"tcg-rulex-engine/pkg/model"
 )
+
+// TestJSONFrontendDepthLimit locks in the round-eight fix: a deeply nested
+// JSON rule must fail at load with a clean error, not overflow the goroutine
+// stack (unrecoverable). The native SQL parser has the same bound; both
+// entry-point-reachable frontends are now guarded.
+func TestJSONFrontendDepthLimit(t *testing.T) {
+	fe := engine.JSONFrontend{}
+
+	// 600 nested {"not": …} wrappers around a leaf: well past the 200 bound.
+	deep := strings.Repeat(`{"not":`, 600) + `{"field":"x","op":"=","value":1}` + strings.Repeat("}", 600)
+	if _, err := fe.Parse(deep); err == nil {
+		t.Error("expected depth error for 600 nested JSON nodes")
+	} else if !strings.Contains(err.Error(), "deeply") {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Nested and-arrays hit the same guard.
+	and := strings.Repeat(`{"and":[`, 600) + `{"field":"x","op":"=","value":1}` + strings.Repeat("]}", 600)
+	if _, err := fe.Parse(and); err == nil {
+		t.Error("expected depth error for 600 nested and-arrays")
+	}
+
+	// A modestly nested rule still parses fine (well under the bound).
+	ok := strings.Repeat(`{"not":`, 50) + `{"field":"x","op":"=","value":1}` + strings.Repeat("}", 50)
+	if _, err := fe.Parse(ok); err != nil {
+		t.Errorf("50-deep JSON rule should parse: %v", err)
+	}
+}
 
 func TestJSONFrontend(t *testing.T) {
 	jsonRule := `{
@@ -48,21 +77,52 @@ func TestJSONFrontend(t *testing.T) {
 	}
 }
 
-// TestStubFrontends ⚠ STALE / 可能已过时：本用例断言 CELFrontend / ExprFrontend.Parse
-// 返回「未实现」错误。但二者现已委托给真实实现 pkg/parser/cel、pkg/parser/expr
-// (cel-go / expr-lang)，Parse("age >= 18") 会成功返回 IR —— 因此本用例当前会失败。
-// 修复二选一：(a) 改为断言解析成功(下方注释给出范式)；(b) 删除本用例。
-//
-//	// (a) 期望成功的写法：
-//	for _, fe := range []engine.Frontend{engine.CELFrontend{}, engine.ExprFrontend{}} {
-//		if node, err := fe.Parse("age >= 18"); err != nil || node == nil {
-//			t.Errorf("%s: expected successful parse, got node=%v err=%v", fe.Name(), node, err)
-//		}
-//	}
+// TestJSONFrontendDateBetween verifies a date-range BETWEEN in a JSON rule
+// compiles to the same bytecode as its SQL equivalent (string bounds desugar to
+// >= AND <=). Regression for the JSON frontend building a numeric-only Between.
+func TestJSONFrontendDateBetween(t *testing.T) {
+	jsonRule := `{"field":"reg_date","op":"between","values":["2020-01-01","2020-12-31"]}`
+	sqlRule := "reg_date BETWEEN '2020-01-01' AND '2020-12-31'"
+
+	jf := engine.NewWithBackend(engine.NewBytecodeBackend(engine.JSONFrontend{}))
+	nf := engine.NewWithBackend(engine.NewBytecodeBackend(engine.NativeFrontend{}))
+	if l, f := jf.LoadRules([]model.Rule{{ID: 300, Name: "json-between", Enabled: true, Expr: jsonRule}}); l != 1 || f != 0 {
+		t.Fatalf("json between load: loaded=%d failed=%d (want 1,0)", l, f)
+	}
+	if l, f := nf.LoadRules([]model.Rule{{ID: 300, Name: "sql-between", Enabled: true, Expr: sqlRule}}); l != 1 || f != 0 {
+		t.Fatalf("sql between load: loaded=%d failed=%d", l, f)
+	}
+	for _, tc := range []struct {
+		val  string
+		want bool
+	}{
+		{"2020-06-15", true},
+		{"2020-01-01", true},
+		{"2020-12-31", true},
+		{"2019-12-31", false},
+		{"2021-01-01", false},
+	} {
+		u := model.User{UID: 1, Fields: map[string]any{"reg_date": tc.val}}
+		gj := len(jf.Match(u)) == 1
+		gn := len(nf.Match(u)) == 1
+		if gj != gn {
+			t.Errorf("reg_date=%s: json=%v != native=%v", tc.val, gj, gn)
+		}
+		if gj != tc.want {
+			t.Errorf("reg_date=%s: got %v want %v", tc.val, gj, tc.want)
+		}
+	}
+}
+
+// TestStubFrontends verifies the CEL and Expr front-ends now parse a basic
+// expression into IR. (They previously returned a "not implemented" error and
+// this test asserted that; both now delegate to the real cel-go / expr-lang
+// parsers in pkg/parser/cel and pkg/parser/expr, so a successful parse is the
+// correct expectation.)
 func TestStubFrontends(t *testing.T) {
 	for _, fe := range []engine.Frontend{engine.CELFrontend{}, engine.ExprFrontend{}} {
-		if _, err := fe.Parse("age >= 18"); err == nil {
-			t.Errorf("%s: expected not-implemented error", fe.Name())
+		if node, err := fe.Parse("age >= 18"); err != nil || node == nil {
+			t.Errorf("%s: expected successful parse, got node=%v err=%v", fe.Name(), node, err)
 		}
 	}
 }

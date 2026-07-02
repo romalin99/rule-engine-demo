@@ -75,6 +75,7 @@ config/*.local.toml
 tmp/
 temp/
 .bak/
+.demo
 
 # Tool caches
 .just/

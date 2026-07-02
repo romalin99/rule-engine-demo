@@ -296,3 +296,138 @@ func TestExplain(t *testing.T) {
 		}
 	}
 }
+
+// TestFunctions covers the SQL scalar functions lowered to value-producing
+// opcodes: string (LOWER/UPPER/TRIM/LENGTH/SUBSTRING) and math (ABS/ROUND/
+// CEIL/FLOOR), plus composition, function-on-both-sides, and NULL propagation.
+func TestFunctions(t *testing.T) {
+	cases := []struct {
+		row  map[string]any
+		rule string
+		want bool
+	}{
+		// string functions
+		{rule: "LOWER(name) = 'abc'", row: map[string]any{"name": "ABC"}, want: true},
+		{rule: "LOWER(name) = 'abc'", row: map[string]any{"name": "ABD"}, want: false},
+		{rule: "UPPER(code) = 'GD'", row: map[string]any{"code": "gd"}, want: true},
+		{rule: "TRIM(name) = 'x'", row: map[string]any{"name": "  x  "}, want: true},
+		{rule: "LENGTH(name) >= 3", row: map[string]any{"name": "数码城"}, want: true},
+		{rule: "LENGTH(name) >= 4", row: map[string]any{"name": "数码城"}, want: false},
+		{rule: "SUBSTRING(name, 1, 2) = '数码'", row: map[string]any{"name": "数码城"}, want: true},
+		{rule: "SUBSTR(phone, 1, 3) = '139'", row: map[string]any{"phone": "13912345678"}, want: true},
+		// math functions
+		{rule: "ABS(delta) <= 5", row: map[string]any{"delta": -3}, want: true},
+		{rule: "ABS(delta) <= 5", row: map[string]any{"delta": -9}, want: false},
+		{rule: "ROUND(score) = 86", row: map[string]any{"score": 85.6}, want: true},
+		{rule: "CEIL(score) = 86", row: map[string]any{"score": 85.1}, want: true},
+		{rule: "FLOOR(score) = 85", row: map[string]any{"score": 85.9}, want: true},
+		// composition with AND; function on the right side
+		{rule: "LENGTH(name) > 2 AND ABS(delta) < 10", row: map[string]any{"name": "abcd", "delta": 4}, want: true},
+		{rule: "LENGTH(name) = LENGTH(nick)", row: map[string]any{"name": "abc", "nick": "xyz"}, want: true},
+		{rule: "LENGTH(name) = LENGTH(nick)", row: map[string]any{"name": "abc", "nick": "wxyz"}, want: false},
+		// functions as the operand of BETWEEN / IN / LIKE / IS NULL
+		{rule: "LENGTH(name) BETWEEN 2 AND 4", row: map[string]any{"name": "abc"}, want: true},
+		{rule: "LENGTH(name) BETWEEN 2 AND 4", row: map[string]any{"name": "a"}, want: false},
+		{rule: "LOWER(city) IN ('bj','sh')", row: map[string]any{"city": "BJ"}, want: true},
+		{rule: "LOWER(city) IN ('bj','sh')", row: map[string]any{"city": "GZ"}, want: false},
+		{rule: "LOWER(city) NOT IN ('bj','sh')", row: map[string]any{"city": "GZ"}, want: true},
+		{rule: "LOWER(name) LIKE 'a%'", row: map[string]any{"name": "ABC"}, want: true},
+		{rule: "UPPER(name) NOT LIKE '%X'", row: map[string]any{"name": "abc"}, want: true},
+		{rule: "TRIM(note) IS NULL", row: map[string]any{}, want: true},
+		{rule: "TRIM(note) IS NOT NULL", row: map[string]any{"note": "x"}, want: true},
+		// date functions
+		{rule: "YEAR(d) = 2026", row: map[string]any{"d": "2026-06-28"}, want: true},
+		{rule: "MONTH(d) = 6", row: map[string]any{"d": "2026-06-28"}, want: true},
+		{rule: "DAY(d) = 28", row: map[string]any{"d": "2026-06-28 21:15:00"}, want: true},
+		{rule: "DATEDIFF('2026-06-28', '2026-06-01') = 27", row: map[string]any{}, want: true},
+		{rule: "DATEDIFF('2026-06-28', d) <= 30", row: map[string]any{"d": "2026-06-10"}, want: true},
+		{rule: "d < CURRENT_DATE", row: map[string]any{"d": "2000-01-01"}, want: true},
+		{rule: "YEAR(CURRENT_DATE) >= 2026", row: map[string]any{}, want: true},
+		// array functions
+		{rule: "ARRAY_LENGTH(tags) >= 2", row: map[string]any{"tags": []string{"vip", "new", "gold"}}, want: true},
+		{rule: "ARRAY_LENGTH(tags) >= 2", row: map[string]any{"tags": []string{"vip"}}, want: false},
+		{rule: "ARRAY_CONTAINS(tags, 'vip')", row: map[string]any{"tags": []string{"vip", "new"}}, want: true},
+		{rule: "ARRAY_CONTAINS(tags, 'gold')", row: map[string]any{"tags": []string{"vip", "new"}}, want: false},
+		{rule: "ARRAY_OVERLAP(tags, 'gold', 'vip')", row: map[string]any{"tags": []string{"vip"}}, want: true},
+		{rule: "ARRAY_CONTAINS(ids, 5)", row: map[string]any{"ids": []any{1, 5, 9}}, want: true},
+		// NULL propagation: a missing field makes the function undef -> compare false
+		{rule: "ABS(delta) <= 5", row: map[string]any{}, want: false},
+		{rule: "LOWER(name) = ''", row: map[string]any{}, want: false},
+	}
+	for _, c := range cases {
+		prog, err := CompileString(c.rule)
+		if err != nil {
+			t.Fatalf("%q: compile: %v", c.rule, err)
+		}
+		if got := prog.Eval(c.row); got != c.want {
+			t.Errorf("%q on %v: got %v want %v", c.rule, c.row, got, c.want)
+		}
+	}
+}
+
+// TestASTMatchesBytecodeFunctions pins the AST runtime to the bytecode VM for
+// function predicates: both evaluators must agree on every (rule, row) pair,
+// including rows where fields are missing (NULL propagation must match).
+func TestASTMatchesBytecodeFunctions(t *testing.T) {
+	rules := []string{
+		"LOWER(name) = 'abc'",
+		"UPPER(code) = 'GD'",
+		"TRIM(name) = 'x'",
+		"LENGTH(name) >= 3",
+		"SUBSTRING(phone, 1, 3) = '139'",
+		"ABS(delta) <= 5",
+		"ROUND(score) = 86",
+		"CEIL(score) = 86",
+		"FLOOR(score) = 85",
+		"LENGTH(name) = LENGTH(nick)",
+		"LENGTH(name) > 2 AND ABS(delta) < 10",
+		// #23: functions as BETWEEN / IN / LIKE / IS NULL operands
+		"LENGTH(name) BETWEEN 2 AND 4",
+		"LOWER(code) IN ('gd','sh')",
+		"LOWER(code) NOT IN ('gd','sh')",
+		"LOWER(name) LIKE 'a%'",
+		"UPPER(name) NOT LIKE '%X'",
+		"TRIM(name) IS NULL",
+		"TRIM(name) IS NOT NULL",
+		// #24: date functions (deterministic; CURRENT_DATE/TIMESTAMP excluded as non-deterministic)
+		"YEAR(d) = 2026",
+		"MONTH(d) >= 6",
+		"DAY(d) < 15",
+		"DATEDIFF('2026-06-28', d) <= 30",
+		// #25: array functions
+		"ARRAY_LENGTH(tags) >= 2",
+		"ARRAY_CONTAINS(tags, 'vip')",
+		"ARRAY_OVERLAP(tags, 'gold', 'vip')",
+		"ARRAY_CONTAINS(ids, 5)",
+	}
+	rows := []map[string]any{
+		{"name": "abc", "code": "gd", "phone": "13912345678", "delta": -3, "score": 85.6, "nick": "xyz", "d": "2026-06-28", "tags": []string{"vip", "new"}, "ids": []any{1, 5, 9}},
+		{"name": "  x  ", "code": "us", "phone": "186000", "delta": 99, "score": 12.0, "nick": "wxyz", "d": "2026-06-10", "tags": []string{"basic"}, "ids": []any{2, 3}},
+		{}, // all fields missing -> both runtimes must agree (NULL -> false)
+	}
+	rt := astrt.New()
+	for _, r := range rules {
+		node, err := ir.Parse(r)
+		if err != nil {
+			t.Fatalf("parse %q: %v", r, err)
+		}
+		prog, err := Compile(node)
+		if err != nil {
+			t.Fatalf("compile %q: %v", r, err)
+		}
+		plan, err := rt.Compile(node)
+		if err != nil {
+			t.Fatalf("ast compile %q: %v", r, err)
+		}
+		for _, row := range rows {
+			bc := prog.Eval(row)
+			a, err := rt.Execute(plan, row)
+			if err != nil {
+				t.Fatalf("ast execute %q: %v", r, err)
+			}
+			if bc != a {
+				t.Errorf("disagree on %q\n row=%v\n bytecode=%v ast=%v", r, row, bc, a)
+			}
+		}
+	}
+}

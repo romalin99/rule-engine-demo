@@ -33,6 +33,14 @@ const (
 	tIs
 	tNot
 	tNull
+	tExists // EXISTS
+	tAny    // ANY / SOME
+	tAll    // ALL
+	tSelect // SELECT (sub-query projection)
+	tFrom   // FROM   (sub-query source collection)
+	tWhere  // WHERE  (sub-query predicate)
+	tStar   // *      (SELECT * in a sub-query)
+	tRegexp // REGEXP / RLIKE
 )
 
 // token is a single lexical token.
@@ -82,11 +90,20 @@ func (l *lexer) next() (token, error) {
 	case r == ',':
 		l.pos++
 		return token{Kind: tComma, Text: ",", Pos: start}, nil
+	case r == '*':
+		l.pos++
+		return token{Kind: tStar, Text: "*", Pos: start}, nil
 	case r == '\'' || r == '"':
 		return l.lexString(r)
 	case r == '=' || r == '!' || r == '>' || r == '<':
 		return l.lexOp()
 	case unicode.IsDigit(r):
+		return l.lexNumber()
+	case r == '-' && (unicode.IsDigit(l.peekNext()) || l.peekNext() == '.'):
+		// A '-' immediately followed by a digit / '.' is a negative number
+		// literal (e.g. `temperature < -10`, `DATE_ADD(d, -7)`, `ROUND(x, -1)`).
+		// This grammar has no binary subtraction operator, so a leading '-' is
+		// unambiguously a sign and never a subtraction.
 		return l.lexNumber()
 	case isIdentStart(r):
 		return l.lexIdent()
@@ -101,9 +118,20 @@ func (l *lexer) lexString(quote rune) (token, error) {
 	var sb []rune
 	for l.pos < len(l.src) {
 		c := l.src[l.pos]
-		if c == '\\' && l.pos+1 < len(l.src) { // escaped char
-			sb = append(sb, l.src[l.pos+1])
-			l.pos += 2
+		if c == '\\' && l.pos+1 < len(l.src) {
+			// A backslash escapes ONLY a quote character or another backslash
+			// (\' \" \\). Every other \x sequence is kept verbatim, so regular
+			// expressions keep their character classes: REGEXP '^1\d{10}$' must
+			// compile the pattern ^1\d{10}$, not ^1d{10}$. (The old rule of
+			// unescaping every \x silently corrupted \d \w \s \b \. patterns.)
+			next := l.src[l.pos+1]
+			if next == '\'' || next == '"' || next == '\\' {
+				sb = append(sb, next)
+				l.pos += 2
+				continue
+			}
+			sb = append(sb, c) // literal backslash: leave \x intact
+			l.pos++
 			continue
 		}
 		if c == quote {
@@ -157,6 +185,9 @@ func (l *lexer) lexOp() (token, error) {
 
 func (l *lexer) lexNumber() (token, error) {
 	start := l.pos
+	if l.src[l.pos] == '-' { // optional leading sign (negative literal)
+		l.pos++
+	}
 	for l.pos < len(l.src) {
 		c := l.src[l.pos]
 		if unicode.IsDigit(c) || c == '.' {
@@ -191,6 +222,20 @@ func (l *lexer) lexIdent() (token, error) {
 		return token{Kind: tNot, Text: text, Pos: start}, nil
 	case "NULL":
 		return token{Kind: tNull, Text: text, Pos: start}, nil
+	case "EXISTS":
+		return token{Kind: tExists, Text: text, Pos: start}, nil
+	case "ANY", "SOME":
+		return token{Kind: tAny, Text: text, Pos: start}, nil
+	case "ALL":
+		return token{Kind: tAll, Text: text, Pos: start}, nil
+	case "SELECT":
+		return token{Kind: tSelect, Text: text, Pos: start}, nil
+	case "FROM":
+		return token{Kind: tFrom, Text: text, Pos: start}, nil
+	case "WHERE":
+		return token{Kind: tWhere, Text: text, Pos: start}, nil
+	case "REGEXP", "RLIKE":
+		return token{Kind: tRegexp, Text: text, Pos: start}, nil
 	}
 	return token{Kind: tIdent, Text: text, Pos: start}, nil
 }

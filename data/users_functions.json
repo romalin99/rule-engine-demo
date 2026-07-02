@@ -1,0 +1,27 @@
+[
+  {
+    "uid": 1,
+    "username": "demo-all-hit",
+    "name": "ABC",
+    "code": "gd",
+    "city": "  北京  ",
+    "city_code": "BJ",
+    "phone": "13912345678",
+    "delta": -3,
+    "score": 85.6,
+    "register_date": "2020-01-01",
+    "birthday": "2000-06-15",
+    "last_login": "2026-06-10",
+    "note": "hello",
+    "tags": ["vip", "新客", "高价值"],
+    "ids": [1, 5, 9]
+  },
+  {
+    "uid": 2,
+    "username": "demo-partial",
+    "name": "Test",
+    "code": "us",
+    "score": 50.0,
+    "tags": ["basic"]
+  }
+]

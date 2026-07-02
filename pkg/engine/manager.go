@@ -91,7 +91,20 @@ func (m *Manager) Remove(id int64) {
 
 // Test compiles a draft expression and evaluates it against a sample row without
 // touching the live rule set — the "Test Rule" button in the editor.
-func (m *Manager) Test(exprText string, row map[string]any) (bool, error) {
+//
+// Both the expression and the row are untrusted external input (the /rules/test
+// HTTP endpoint feeds them straight in). Compile and Eval are panic-contained
+// here rather than relying on an HTTP-layer recover: the CLI `Serve`/`NewApp`
+// paths mount no recover middleware, and Test is a distinct eval boundary from
+// the batch matchInto path — so a compile/eval panic on hostile input is turned
+// into a clean error instead of taking the process (or the connection
+// goroutine) down. A recovered panic reports as a normal draft error.
+func (m *Manager) Test(exprText string, row map[string]any) (matched bool, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			matched, err = false, fmt.Errorf("rule test failed (recovered): %v", r)
+		}
+	}()
 	plan, err := m.eng.Backend().Compile(exprText)
 	if err != nil {
 		return false, err

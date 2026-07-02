@@ -12,6 +12,7 @@ package engine
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"tcg-rulex-engine/pkg/model"
 )
@@ -34,7 +35,15 @@ type Matcher interface {
 type Engine struct {
 	backend Backend
 	cache   *RuleCache
+	// evalPanics counts recovered evaluation panics (see matchInto). Rules and
+	// row data are external input; a non-zero value means some rule/row pair
+	// hit an engine bug or a hostile construct and was failed safe.
+	evalPanics atomic.Int64
 }
+
+// EvalPanics reports how many per-user evaluations were recovered from a
+// panic since the engine was created (0 in healthy operation).
+func (e *Engine) EvalPanics() int64 { return e.evalPanics.Load() }
 
 // compile-time check that *Engine satisfies the Matcher interface.
 var _ Matcher = (*Engine)(nil)
@@ -71,7 +80,7 @@ func (e *Engine) compile(rules []model.Rule) (progs []*model.RuleProgram, failed
 		if !r.Enabled {
 			continue
 		}
-		ast, err := e.backend.Compile(r.Expr)
+		ast, err := e.compileOne(r.Expr)
 		if err != nil {
 			failed++
 			continue
@@ -81,6 +90,23 @@ func (e *Engine) compile(rules []model.Rule) (progs []*model.RuleProgram, failed
 		})
 	}
 	return progs, failed
+}
+
+// compileOne compiles a single rule's text with panic containment. Rule text
+// is untrusted (POST /rules upserts it; the file watcher reloads it), and this
+// is the one choke point every compile path funnels through — LoadRules,
+// ReplaceRules, AddRule, ReloadFromFile. A recovered panic becomes a normal
+// compile error, so one hostile rule fails to load instead of taking down the
+// request goroutine (or, on the recover-less CLI path, the process). Parsing is
+// already depth-bounded and qlbridge parsing is isolated; this is the
+// defence-in-depth backstop around the whole front-end + lowering chain.
+func (e *Engine) compileOne(expr string) (ast any, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ast, err = nil, fmt.Errorf("rule compile panic (recovered): %v", r)
+		}
+	}()
+	return e.backend.Compile(expr)
 }
 
 // LoadRules compiles enabled rules and ADDS them to the cache (merge). Returns
@@ -142,7 +168,20 @@ func (e *Engine) Match(u model.User) []int64 {
 }
 
 // matchInto is the shared match routine; dst is a reusable scratch buffer.
-func (e *Engine) matchInto(u model.User, rules []*model.RuleProgram, dst []int64) []int64 {
+//
+// Evaluation is panic-contained per user: rules and row data are external
+// input, and a panic escaping a Pool worker goroutine would kill the whole
+// process (a goroutine panic cannot be recovered anywhere else). Matching is
+// fail-safe — a rule that cannot evaluate does not match — so on a recovered
+// panic the user keeps the matches collected so far, the batch continues,
+// and the event is counted in EvalPanics for observability.
+func (e *Engine) matchInto(u model.User, rules []*model.RuleProgram, dst []int64) (out []int64) {
+	defer func() {
+		if r := recover(); r != nil {
+			e.evalPanics.Add(1)
+			out = dst
+		}
+	}()
 	ctx := e.backend.NewContext(u.Fields)
 	dst = dst[:0]
 	for _, p := range rules {
