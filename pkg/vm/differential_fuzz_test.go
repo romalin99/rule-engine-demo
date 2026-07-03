@@ -57,7 +57,7 @@ func (g *fzGen) likePattern() string {
 
 // leaf emits one parse+compile-clean predicate.
 func (g *fzGen) leaf() string {
-	switch g.r.Intn(24) {
+	switch g.r.Intn(25) {
 	case 0: // field cmp literal (number or string)
 		if g.r.Intn(2) == 0 {
 			return g.pick(fzFields) + " " + g.pick(fzCmps) + " " + g.num()
@@ -198,6 +198,34 @@ func (g *fzGen) leaf() string {
 			}
 			return "profile IS NOT NULL"
 		}
+	case 23: // round-14 common-SQL functions (strings/math/dates/JSON/regexp)
+		switch g.r.Intn(8) {
+		case 0:
+			return "LOCATE(" + g.str() + ", " + g.pick(fzFields) + ") >= " + g.num()
+		case 1:
+			return "MOD(" + g.pick(fzFields) + ", 7) = " + g.num()
+		case 2:
+			return "GREATEST(" + g.pick(fzFields) + ", " + g.pick(fzFields) + ") " + g.pick(fzCmps) + " " + g.str()
+		case 3:
+			return "QUARTER(" + g.pick(fzFields) + ") = " + g.num()
+		case 4:
+			return "JSON_LENGTH(profile) >= " + g.num()
+		case 5:
+			return "JSON_CONTAINS(profile, " + g.str() + ", '$.city')"
+		case 6:
+			return "JSON_VALID(" + g.pick(fzFields) + ")"
+		default:
+			return "REGEXP_SUBSTR(" + g.pick(fzFields) + ", '" + g.pick(fzRegexps) + "') = " + g.str()
+		}
+	case 24: // IN (SELECT ...) sub-query membership (round 14)
+		not := ""
+		if g.r.Intn(2) == 0 {
+			not = "NOT "
+		}
+		if g.r.Intn(2) == 0 {
+			return g.pick(fzFields) + " " + not + "IN (SELECT label FROM tags_rows)"
+		}
+		return g.str() + " " + not + "IN (SELECT status FROM orders WHERE amount > " + g.num() + ")"
 	default: // function-left LIKE (LikeTerm)
 		return "LOWER(" + g.pick(fzFields) + ") LIKE '" + g.likePattern() + "'"
 	}

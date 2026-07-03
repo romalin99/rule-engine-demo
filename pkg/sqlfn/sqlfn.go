@@ -32,6 +32,7 @@ package sqlfn
 import (
 	"strconv"
 	"strings"
+	"sync/atomic"
 )
 
 // Builtin describes one extended function: its arity bounds, whether it is
@@ -98,6 +99,35 @@ func IsBoolFn(name string) bool {
 	return ok && b.Bool
 }
 
+// recoveredPanics counts builtin invocations whose implementation panicked and
+// was contained by SafeCall (each one is a bug — the contract says builtins
+// are total — but it must never cost the process).
+var recoveredPanics atomic.Int64
+
+// RecoveredPanics reports how many builtin panics SafeCall has contained since
+// process start (export it next to the engine's EvalPanics; non-zero values
+// deserve an alert).
+func RecoveredPanics() int64 { return recoveredPanics.Load() }
+
+// SafeCall invokes a builtin with panic containment: a panicking
+// implementation yields NULL, exactly like every other invalid input. This is
+// the single choke point both runtimes call through (the VM's OpCallB and the
+// AST runtime's applyBuiltin), so the 130+ registered implementations —
+// including the third-party-backed ones (USERAGENT via mssola/user_agent,
+// HASH_SIP via dchest/siphash) — can never take a worker down, even when
+// Program.Eval is used directly without the engine's matchInto recover.
+// The defer is open-coded by the compiler (single defer, no loop), so the
+// no-panic fast path costs ~1 ns on top of an already-allocating call.
+func SafeCall(b *Builtin, args []any) (out any) {
+	defer func() {
+		if recover() != nil {
+			recoveredPanics.Add(1)
+			out = nil
+		}
+	}()
+	return b.Fn(args)
+}
+
 // Names returns every registered function name (for docs / editor completion).
 func Names() []string {
 	out := make([]string, len(byID))
@@ -118,6 +148,8 @@ func init() {
 	registerDates2()
 	registerNet2()
 	registerParity()
+	registerSQLPlus() // round fourteen: common-SQL additions — keep LAST so
+	// every previously registered builtin keeps its OpCallB ID
 }
 
 // ---- shared coercions -------------------------------------------------------

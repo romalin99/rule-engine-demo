@@ -106,6 +106,25 @@ const (
 	// pkg/sqlfn (expression pre-compiled and cached at rule load).
 	OpJmesField // A=json idx: push JMESPath result from a raw field doc (Program.JSONs[A])
 	OpJmesExpr  // A=json idx: pop doc-string -> push JMESPath result
+
+	// Common-SQL JSON functions (round fourteen): JSON_LENGTH / JSON_TYPE /
+	// JSON_VALID (JSONOp.Fn selects which) and JSON_CONTAINS. They share
+	// JSON_EXTRACT's raw-document model — a field document is read raw (so a
+	// pre-parsed object, the kOpaque row shape, works identically to its JSON
+	// string form); a computed document is rendered from the stack. Semantics
+	// live in pkg/sqlfn (JSONLength / JSONTypeOf / JSONValid /
+	// JSONDeepContains), shared verbatim with the AST runtime.
+	OpJSONFnField // A=json idx: push JSONs[A].Fn over a raw field doc
+	OpJSONFnExpr  // A=json idx: pop doc-string -> push JSONs[A].Fn over it
+	OpJSONCntField // A=json idx: pop candidate -> push JSON_CONTAINS(field doc, candidate)
+	OpJSONCntExpr  // A=json idx: pop candidate, pop doc-string -> push JSON_CONTAINS
+)
+
+// JSONOp.Fn selectors for OpJSONFnField / OpJSONFnExpr.
+const (
+	jsonFnLen uint8 = iota // JSON_LENGTH
+	jsonFnType             // JSON_TYPE
+	jsonFnValid            // JSON_VALID (no path)
 )
 
 // AggOp describes one scalar aggregate sub-query. Fn is COUNT/SUM/MIN/MAX/AVG;
@@ -118,13 +137,15 @@ type AggOp struct {
 	Coll  string
 }
 
-// JSONOp describes one JSON_EXTRACT call. Path is the `$.a.b[0]` accessor;
-// FieldIdx indexes Program.Fields when the document is a row field (so the raw
-// value — a JSON string or an already-parsed object — is read directly), or -1
-// when the document is produced on the stack (OpJSONExpr).
+// JSONOp describes one JSON accessor call. Path is the `$.a.b[0]` accessor
+// ("" when the function takes no path); FieldIdx indexes Program.Fields when
+// the document is a row field (so the raw value — a JSON string or an
+// already-parsed object — is read directly), or -1 when the document is
+// produced on the stack; Fn selects the function for OpJSONFnField/Expr.
 type JSONOp struct {
 	Path     string
 	FieldIdx int32
+	Fn       uint8
 }
 
 // SubProg is a compiled sub-query attached to a Program (referenced by index
@@ -159,6 +180,13 @@ type Program struct {
 	JSONs   []JSONOp         // JSON_EXTRACT accessors referenced by OpJSONField/OpJSONExpr
 	Regexps []*regexp.Regexp // pre-compiled patterns referenced by OpRegexp
 	Aggs    []AggOp          // aggregate sub-queries referenced by OpAggSub
+
+	// ok records that the program passed structural validation (set by
+	// Compile, or by an explicit Validate call on a hand-built program,
+	// BEFORE the program is shared — so Eval's read is race-free). Eval
+	// re-checks unvalidated programs on every call instead of risking an
+	// out-of-range pool read, which would panic. See validate.go.
+	ok bool
 }
 
 // Len reports the number of instructions.

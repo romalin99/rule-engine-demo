@@ -189,7 +189,74 @@
 项边界、SPLIT 上界、外部 IR 钉死,全部断言 **bytecode == ast**);模糊器模板与行
 生成器扩展后,该缺陷类纳入每次 `TestDifferentialFuzz` 的常规覆盖。
 
-## 14. 未实施建议(Roadmap)
+## 14. SQL 常用函数扩展的安全面(第十四轮,2026-07-03)
+
+本轮新增 45 个常用 SQL 函数 + `IN (SELECT …)` 语法(见 sql_feature_audit.md 第九期)。
+新函数全部进入与既有函数相同的威胁模型(规则文本与行数据均不可信),逐类风险与既有
+防线的对接如下:
+
+| 类别 | 风险点 | 处置 |
+|------|--------|------|
+| 字符串构建(`REPEAT`/`LPAD`/`RPAD`) | 🟡 输出放大:`REPEAT(大字段, k)`、`LPAD(s, 巨大 n, pad)` 可造 GB 级分配 | **分配前**投影封顶 `maxStringOut`(1 MiB)→ NULL;`LPAD/RPAD` 对 n<0 一并 NULL |
+| `SUBSTRING_INDEX` | 🟡 若用 `strings.Split` 实现会复现 SPLIT 的切片头放大(第十三轮 §13) | 刻意用**双遍扫描**(O(n) 时间、O(1) 分配),无该面;重叠分隔符语义经 12 万随机差分钉死 |
+| 正则三件套(`REGEXP_SUBSTR/INSTR/REPLACE`) | 🟡 模式可为行数据驱动 → 编译 CPU / 缓存内存;`REGEXP_REPLACE` 的 `$1` 展开可放大输出 | 复用 `URL_MATCHQS` 的既有防线:`MaxRegexpPattern`(4 KiB)+ 封顶缓存(1024);REPLACE **先数匹配次数投影**(空匹配强制步进防死循环),再对 `$` 展开结果后置校验,双界 → NULL;RE2 线性匹配无 ReDoS |
+| `GREATEST/LEAST`、`MOD/TRUNCATE/LOG*` | 🟢 纯计算,NULL/定义域/非有限结果全部收敛为 NULL(不 panic、不 Inf 外泄) | `finiteOrNil` 统一收口;`MOD(x,0)`、`LOG(≤0)`、`TRUNCATE` 溢出 → NULL |
+| 日期族(`TIMESTAMPDIFF/DATE_FORMAT/LAST_DAY/…`) | 🟢 纯计算;`TIMESTAMPDIFF` 裸单位在**解析期**白名单校验(未知单位=加载错误,不是静默 NULL) | 月差按 MySQL 日号+时刻比较,20 万随机差分与规则复述零漂移(避免 AddDate 月末归一化的隐性错误) |
+| JSON 四函数 | 🟠 语义一致性风险:若走 sqlfn 注册表,`kOpaque`(已解析对象字段)经 `valueAny` 变 NULL,会复现第十三轮修掉的"字符串行可用、解析态行失效"陷阱 | 采用**核心下降**(复用 JSON_EXTRACT 的 raw-doc 模式),语义函数(`JSONLength/JSONTypeOf/JSONValid/JSONDeepContains`)在 pkg/sqlfn 单点实现、双运行时共用;路径必须字面量(行数据无法注入路径);`JSONDeepContains` 递归深度受文档自身嵌套深度界定(stdlib 解码上限),候选解析失败降级字符串标量而非报错 |
+| `IN (SELECT …)` | 🟢 纯脱糖为既有 `QuantSub`(无新求值面);`NOT IN` 的 SQL 三值语义按本引擎**两值逻辑**实现(`!= ALL`),已在 functions.md §4 注明 | 投影列缺失 = 解析错误(`SELECT *` 不允许作成员测试) |
+| 全体 | 🟢 确定性:未引入 `RAND()`/`UUID()` 类非确定函数(可重放/审计约束,与既有跳过清单一致);注册表**尾部追加**,既有 OpCallB ID 不漂移(有测试钉死) | — |
+
+## 15. Panic 风险全面审计(第十五轮,2026-07-03)
+
+专题:穷举"什么能让进程死"。Go 的 panic 代价分三档 —— **worker 协程内未 recover 的
+panic = 进程死亡**;**并发 map 写 / 栈耗尽 = fatal,recover 无效**;编译/请求路径的
+panic = 单请求失败(有 recover 时)。以此为轴逐类审计:
+
+### 15.1 逐类 panic 源 × 现状
+
+| Panic 类 | 审计结论 |
+|----------|----------|
+| **切片/索引越界** | 求值层全部预夹紧:`substr`(第七轮回绕修复)、`ARRAY_INDEX/ARRAY_SLICE`(normIndex)、`LEFT/RIGHT`(clampLen)、`LOCATE/regexpArgs`(pos 先验界检查)、VM 栈每条指令 `sp` 界检查、`SUBSTRING_INDEX` 双遍扫描的 `Index` 结果经 `strings.Count` 前证非负。池索引(`p.Strs[in.A]` 等)由编译器生成、Program 不可变 → 越界仅可能来自**手工构造的 Program**(见 15.3 残余) |
+| **整数除零**(Go panic) | 全库仅两处变量除法:`pr[len(fill)%len(pr)]`(pad 非空已验)、`timestampDiff` 的常量除数;`MOD(x,0)` 在调用 `math.Mod` 前拦截为 NULL(float 除零本身不 panic) |
+| **`strings.Repeat` 负计数**(panic) | `REPEAT` k≤0 → `''`;`pad3/pad6/strftime %j` 的补零宽度经值域证明非负(≤999/≤999999/YearDay≤366) |
+| **无 ok 类型断言** | 求值/编译路径全部 comma-ok;仅存 3 处直断言,均为单写入者类型不变量:AST `reCache`/`jmesCache`(存入即 `*regexp.Regexp`/`*JMESPath`)、`mustRegisterOrGet` 的 `.(C)`(**启动期** fail-fast,非请求路径) |
+| **递归栈耗尽**(fatal,不可 recover) | 规则文本:解析深度 200(第七轮)封死全链路。**外部构造 IR:本轮补 `vm.Compile` 深度守卫**(`maxIRDepth`=500,`emit`/`emitTerm` 双入口,且经 `compileAt` **跨子查询 Where 链累计**,防 EXISTS 嵌套洗深度)→ 编译错误而非崩溃。`JSONDeepContains` 递归深度受 stdlib JSON 解码上限(~10000 层)界定,万级栈帧远低于 Go 协程栈上限 |
+| **并发 map 写**(fatal) | 规则缓存 `sync.Map` + 原子换代;`reCache/jmesCache` `sync.Map`;URL_MATCHQS 缓存 LoadOrStore+原子计数;批处理 `partials` 按 worker 分片、`results[idx]` 互斥索引写、Stats 在 `wg.Wait()` 后单线程归并;行 map 求值期只读(`matchPrefix` 仅迭代) |
+| **第三方库**(行数据可达) | `mssola/user_agent`(USERAGENT)与全部 130+ builtin:**本轮 `sqlfn.SafeCall` 单点 recover**(VM `OpCallB` 与 AST `applyBuiltin` 唯一入口,panic → NULL + `sqlfn.RecoveredPanics()` 计数);`go-jmespath` `Search`(历史存在病态输入 panic 面):**本轮 `JmesEval` 内置 recover**;`dchest/siphash` 纯计算(SafeCall 兜底);qlbridge 解析器 panic 早有 `safeQLParse` 隔离(第七轮) |
+| **协程边界**(泄漏面=进程死) | 逐一核对全部 `go` 起点:批处理 worker(`matchInto` 每用户 recover+`EvalPanics` 计数)、热重载(`reloadSafely`)、文件 watcher(CLI 路径经 reloadSafely)、Kafka 分区 worker(defer recover)、FlightRecorder(`gos.Recover`)、`gos.GoSafe/RunSafe`(recover+日志冲刷);`RecoverThenCrash` 的 re-panic 为**有意**的关键路径语义;shutdown 协程为库调用、影响面仅优雅退出 |
+| **编译/加载边界** | `compileOne` 对**整个前端+下降链**的 recover 背板(第九轮),规则文本引发的任何普通 panic → 单条加载失败;本轮深度守卫补上它管不了的栈耗尽 |
+| **HTTP 边界** | `middleware.Recover` 已接线(cmd/api main:255,先于路由),panic → 500 + 日志,无 re-panic;`infra/tx` 的 recover-rollback-再 panic 由外层 Recover 收口 |
+| **故意 panic 面** | `logs.Panic*` API **零调用点**;`pond` 池零提交点(工具预留);`mustRegisterOrGet` 仅启动期 |
+
+### 15.2 本轮加固(3 处)
+
+| # | 缺口 | 加固 |
+|---|------|------|
+| 1 | 🟠 130+ builtin 实现(含三方库)任一潜在 bug 可穿透 `Program.Eval`(Eval 刻意无 recover;engine 的 matchInto 兜底粒度是整用户,且**库用户直调 Eval 无兜底**) | `sqlfn.SafeCall` 单点 recover(两运行时唯一调用通道),panic → NULL(fail-safe 不命中)+ 原子计数 `RecoveredPanics()` 可观测;defer 为 open-coded,无 panic 快路径 ~1ns |
+| 2 | 🟠 `go-jmespath.Search` 由行数据驱动,历史上有病态文档 panic 面 | `JmesEval` 内置 recover → NULL |
+| 3 | 🟡 外部构造的深嵌套 IR 走 `vm.Compile` 递归 → 栈耗尽是 **recover 不可捕获**的 fatal(`compileOne` 背板无效) | `maxIRDepth`(500)双入口守卫 + 深度跨子查询编译继承;文本规则(≤200)不受影响,有 90 层文本规则回归钉死 |
+
+### 15.3 残余风险 → 本期追加修复(第十六轮,同日)
+
+第十五轮记录在案的 3 项残余,按"修复风险"的要求全部转为已修复(热路径零税设计):
+
+| # | 原残余 | 修复 |
+|---|--------|------|
+| 1 | **手工构造的 `vm.Program`** 携带越界池索引 → Eval 内 `p.Fields[in.A]` 等无验界读 panic;深手工 Where 链 → Eval 递归栈耗尽 | 新增 `Program.Validate()`(**迭代式**:全 opcode→池映射逐指令验界、nil 正则槽、未知 builtin id/元数、子程序嵌套 ≤ `ir.MaxNesting`)。`Compile` 产物**构造期置位** `ok`(发布前单写,无竞态),Eval 入口仅一个可预测分支 → **编译路径零额外开销**;未校验的手工程序每次 Eval 惰性 `check()`,坏程序 → false 而非 panic。`Compile` 顶层顺带跑一次自检(未来编译器 bug 的加载期绊线) |
+| 2 | **AST 运行时对深外部 IR 的 Execute 递归** | `ast.Compile` 以 `ir.TooDeep`(**迭代测深**,恶意输入不可能反向压爆测量本身)拒绝 > `ir.MaxNesting` 的树 → 普通编译错误;解析产物(≤200)不受影响 |
+| 3 | **`ir.Emit`/`EmitJSON`/`Optimize` 对深外部 IR 的递归** | 三个公共入口统一挂 `TooDeep` 门:`Emit` → `""`(与既有"不可表示 → 空串"约定一致)、`EmitJSON` → 错误、`Optimize` → 原样返回(恒语义保持);门只在公共入口跑一次,内部递归不重复测深(避免二次方);`Optimize` 去重改用包内 `emitSQL` 免重复门 |
+| 4 | **启动期 fail-fast**(`mustRegisterOrGet` 等) | **维持有意设计**:坏配置应拒绝启动而非带病运行(唯一保留项) |
+
+统一深度预算收敛为单一常量 **`ir.MaxNesting`(500)**:字节码编译器计数守卫、AST 装载门、
+发射器/优化器门、`Program.Validate` 子程序链共用,解析上限 200 保有 2.5× 裕度。
+
+回归:`pkg/sqlfn/safecall_test.go`(panic/panic(nil)/健康路径 + 计数)、
+`pkg/vm/panic_safety_test.go`(10 万层 NOT/CALL/EXISTS-Where 深 IR → **两套运行时**编译错误
+不崩溃;Emit/EmitJSON/Optimize 深 IR 降级形态;90 层文本规则两运行时正常编译)、
+`pkg/vm/validate_test.go`(8 类坏手工 Program → Validate 错误 + Eval false;10 万层手工
+Where 链 → 迭代校验拒绝;合法手工程序惰性通过;编译产物快路径)。
+
+## 16. 未实施建议(Roadmap)
 
 - 🔑 **控制台变更端点无鉴权**(`POST /rules`、`DELETE /rules/:id`、`POST /versions/:v/rollback`):
   企业部署下这是**首要加固项**。刻意不在库内硬编码鉴权(会给出虚假安全感,且租户/RBAC 模型需按部署

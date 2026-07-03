@@ -27,6 +27,11 @@ import (
 // parse either, so the limitation is symmetric.) Callers that want a best-effort
 // string can use Emit(n, JSONRule), which drops the error.
 func EmitJSON(n Node) (string, error) {
+	// jsonNodeOf recurses; gate externally built IR before walking (parser
+	// output is bounded at 200 levels and never triggers this).
+	if TooDeep(n) {
+		return "", fmt.Errorf("ir: tree nested too deeply (max %d levels)", MaxNesting)
+	}
 	m, err := jsonNodeOf(n)
 	if err != nil {
 		return "", err

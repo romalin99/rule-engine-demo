@@ -25,6 +25,13 @@ const stackMax = 256
 // concurrent use from many goroutines (each call has its own stack). This is
 // what lets the worker pool share one *Program across all workers.
 func (p *Program) Eval(row map[string]any) bool {
+	// Compiled programs pass this predictable branch for free; a hand-built
+	// program that never went through Compile/Validate is structurally
+	// checked here so a bad pool index degrades to false instead of an
+	// unrecoverable slice panic on a worker goroutine (see validate.go).
+	if !p.ok && p.check() != nil {
+		return false
+	}
 	var st [stackMax]Value
 	sp := 0
 
@@ -34,7 +41,7 @@ func (p *Program) Eval(row map[string]any) bool {
 
 		case OpLoadField, OpConstNum, OpConstStr, OpCurrentDate, OpCurrentTs,
 			OpExistsSub, OpJSONField, OpAggSub, OpMatchPre, OpMapKeys, OpMapVals,
-			OpJmesField: // push one value (loads, consts and row-backed factors)
+			OpJmesField, OpJSONFnField: // push one value (loads, consts and row-backed factors)
 			if sp >= stackMax {
 				return false
 			}
@@ -62,11 +69,20 @@ func (p *Program) Eval(row map[string]any) bool {
 			}
 			st[sp-1] = callValue(in.Op, st[sp-1])
 
-		case OpQuantSub, OpJSONExpr, OpJmesExpr: // pop x -> push computed value (pool-backed)
+		case OpQuantSub, OpJSONExpr, OpJmesExpr, OpJSONFnExpr,
+			OpJSONCntField: // pop x -> push computed value (pool-backed)
 			if sp < 1 {
 				return false
 			}
 			st[sp-1] = p.replaceValue(in, st[sp-1], row)
+
+		case OpJSONCntExpr: // pop candidate, doc -> push JSON_CONTAINS(doc, candidate)
+			if sp < 2 {
+				return false
+			}
+			res := boolV(p.jsonContains(p.JSONs[in.A], st[sp-2].asString(), st[sp-1]))
+			sp--
+			st[sp-1] = res
 
 		case OpDateDiff, OpArrContains, OpArrIntersect, OpRound2, OpDateAdd2,
 			OpDateSub2, OpQuantArr: // pop b,a -> push f(a, b)
@@ -98,7 +114,11 @@ func (p *Program) Eval(row map[string]any) bool {
 				args[j] = valueAny(st[sp-argc+j])
 			}
 			sp -= argc
-			st[sp] = toValue(b.Fn(args))
+			// SafeCall contains a panicking builtin implementation as NULL —
+			// Eval itself deliberately has no recover (zero-cost hot loop),
+			// so this is what keeps a buggy/third-party builtin from killing
+			// callers that use Program.Eval without the engine's matchInto.
+			st[sp] = toValue(sqlfn.SafeCall(b, args))
 			sp++
 
 		default:
@@ -131,6 +151,9 @@ func (p *Program) pushValue(in Instr, row map[string]any) Value {
 	case OpJmesField:
 		jo := p.JSONs[in.A]
 		return toValue(sqlfn.JmesEval(row[p.Fields[jo.FieldIdx]], jo.Path))
+	case OpJSONFnField:
+		jo := p.JSONs[in.A]
+		return jsonFnValue(jo, row[p.Fields[jo.FieldIdx]])
 	default: // OpLoadField, OpConstNum, OpConstStr, OpCurrentDate, OpCurrentTs
 		return p.load(in, row)
 	}
@@ -145,9 +168,54 @@ func (p *Program) replaceValue(in Instr, x Value, row map[string]any) Value {
 		return boolV(p.quantSub(in.A, x, row))
 	case OpJSONExpr: // JSON scalar from a computed document string
 		return jsonExtract(x.asString(), p.JSONs[in.A].Path)
+	case OpJSONFnExpr: // JSON_LENGTH/TYPE/VALID over a computed document string
+		return jsonFnValue(p.JSONs[in.A], x.asString())
+	case OpJSONCntField: // JSON_CONTAINS(field doc, candidate) — x is the candidate
+		jo := p.JSONs[in.A]
+		return boolV(p.jsonContains(jo, row[p.Fields[jo.FieldIdx]], x))
 	default: // OpJmesExpr: JMESPath result from a computed document string
 		return toValue(sqlfn.JmesEval(x.asString(), p.JSONs[in.A].Path))
 	}
+}
+
+// jsonFnValue evaluates JSON_LENGTH / JSON_TYPE / JSON_VALID over a raw
+// document value (semantics shared with the AST runtime via pkg/sqlfn).
+func jsonFnValue(jo JSONOp, raw any) Value {
+	if jo.Fn == jsonFnValid {
+		return boolV(sqlfn.JSONValid(raw))
+	}
+	root := jsonRoot(raw)
+	if root == nil {
+		return undef
+	}
+	cur := root
+	if jo.Path != "" {
+		var ok bool
+		if cur, ok = navigateJSON(root, jo.Path); !ok {
+			return undef
+		}
+	}
+	if jo.Fn == jsonFnLen {
+		return toValue(sqlfn.JSONLength(cur))
+	}
+	return toValue(sqlfn.JSONTypeOf(cur))
+}
+
+// jsonContains evaluates JSON_CONTAINS(doc, candidate[, path]) over a raw
+// document value and a candidate stack value.
+func (p *Program) jsonContains(jo JSONOp, rawDoc any, cand Value) bool {
+	root := jsonRoot(rawDoc)
+	if root == nil {
+		return false
+	}
+	tgt := root
+	if jo.Path != "" {
+		var ok bool
+		if tgt, ok = navigateJSON(root, jo.Path); !ok {
+			return false
+		}
+	}
+	return sqlfn.JSONDeepContains(tgt, sqlfn.JSONCandidate(valueAny(cand)))
 }
 
 // binaryValue computes a two-operand value opcode (pop b, a; push f(a, b)).
@@ -775,7 +843,8 @@ func jsonExtract(raw any, path string) Value {
 }
 
 // jsonRoot returns a navigable JSON value: it parses a JSON string, passes a
-// pre-decoded object/array through, and rejects anything else.
+// pre-decoded object/array through (a typed []map[string]any nested-row
+// collection reads as the JSON array it is), and rejects anything else.
 func jsonRoot(raw any) any {
 	switch x := raw.(type) {
 	case string:
@@ -788,6 +857,12 @@ func jsonRoot(raw any) any {
 		return x
 	case []any:
 		return x
+	case []map[string]any:
+		out := make([]any, len(x))
+		for i, e := range x {
+			out[i] = e
+		}
+		return out
 	default:
 		return nil
 	}

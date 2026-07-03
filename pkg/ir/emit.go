@@ -26,7 +26,14 @@ var AllDSLs = []DSL{SQL, Aviator, CEL, Expr, JSONRule}
 // result is always a string; for JSONRule it delegates to EmitJSON and drops
 // the error (unrepresentable nodes yield ""), so callers that need to surface
 // that error should use EmitJSON or Convert instead.
+//
+// A tree beyond MaxNesting yields "" like any other unrepresentable input:
+// the emitters recurse, and externally built IR must not be able to exhaust
+// the stack (parser-produced trees are bounded at 200 and never hit this).
 func Emit(n Node, d DSL) string {
+	if TooDeep(n) {
+		return ""
+	}
 	switch d {
 	case SQL:
 		return emitSQL(n)

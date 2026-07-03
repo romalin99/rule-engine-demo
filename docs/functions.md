@@ -85,7 +85,7 @@ ISO 字符串存放时,字典序即时间序(`'2026-01-01' < '2026-02-01'`)。�
 | ---- | ---- |
 | 比较 | `=` `==` `!=` `<>` `>` `>=` `<` `<=` |
 | 区间 | `x BETWEEN lo AND hi`(边界可为**字面量、字段或函数**:`age BETWEEN min_age AND max_age`、`d BETWEEN DATE_SUB(CURRENT_DATE, 7) AND CURRENT_DATE`) |
-| 集合 | `x IN (a, b, …)` / `x NOT IN (…)` |
+| 集合 | `x IN (a, b, …)` / `x NOT IN (…)`；子查询形式 `x [NOT] IN (SELECT col FROM coll [WHERE …])`（脱糖为 `= ANY` / `!= ALL`，两值逻辑） |
 | 模糊 | `x LIKE 'a%'` / `x NOT LIKE '%b%'`;完整 SQL 通配符:`%` 任意位置(含中间)、`_` 恰好一个字符、`\%` `\_` 转义为字面量 |
 | 正则 | `x REGEXP '正则'` / `x NOT REGEXP '...'`(Go **RE2** 语法;`RLIKE` 同义;另见 [§5.6](#56-正则匹配-regexp)) |
 | 空值 | `x IS NULL` / `x IS NOT NULL` |
@@ -516,6 +516,72 @@ match_type 标志(折叠为模式前缀 `(?i)`/`(?m)`/`(?s)`):`i` 大小写不�
 > `USERAGENT(ua, part)` 覆盖)。
 
 ---
+
+### 5.9 SQL 常用函数补充（第十四轮） (Common-SQL additions)
+
+按"点名函数 + **等 SQL 常用函数**"的口径补齐的 45 个可调用名(语义对齐 MySQL,
+偏差已注明;全部同时可用于两套运行时,字符串位置一律按 **rune** 计,中文安全)。
+
+**字符串**:
+
+| 函数 | 说明 |
+|------|------|
+| `LTRIM(s)` / `RTRIM(s)` | 去左/右空白(Unicode 空白,MySQL 仅去空格——超集) |
+| `LEFT(s, n)` / `RIGHT(s, n)` | 前/后 n 个字符;n≤0 → `''` |
+| `REVERSE(s)` | 字符反转 |
+| `REPEAT(s, n)` | 重复 n 次;n≤0 → `''`;超出 1 MiB 投影 → NULL |
+| `LPAD/RPAD(s, n, pad)` | 补齐到**恰好** n 字符(超长截断;pad 为空且需补 → `''`,MySQL);n<0 或超上界 → NULL |
+| `LOCATE(sub, s[, pos])` / `INSTR(s, sub)` | 1 起 rune 位置,不存在 → **0**(MySQL;注意 `STRING_INDEX` 是 qlbridge 的 0 起字节偏移、不存在 → NULL) |
+| `SUBSTRING_INDEX(s, d, count)` | 第 count 个分隔符之前(负数从右计);从左**非重叠**计数(split 语义);无分隔符 → 整串 |
+| `INITCAP(s)` | `TITLECASE` 的 Oracle/PG 拼写 |
+
+**数学**:
+
+| 函数 | 说明 |
+|------|------|
+| `MOD(a, b)` | 余数,符号随被除数;`MOD(x, 0)` → NULL |
+| `SIGN(x)` | -1 / 0 / 1 |
+| `TRUNCATE(x, d)` | 向零截断到 d 位小数(d 可为负) |
+| `GREATEST(...)` / `LEAST(...)` | 最大/最小;**任一参数为 NULL → NULL**(MySQL);全数值按数值,否则按渲染文本字典序 |
+| `EXP/LN/LOG/LOG10/LOG2` | `LOG(x)`=自然对数,`LOG(b, x)`=以 b 为底(MySQL 参数序);非法定义域 → NULL |
+| `PI()` | π |
+
+**日期**:
+
+| 函数 | 说明 |
+|------|------|
+| `QUARTER/WEEKOFYEAR/DAYOFYEAR/DAYOFMONTH/MONTHNAME/DAYNAME([x])` | 0 参=当前时刻;`WEEKOFYEAR` 为 ISO 周(= MySQL WEEKOFYEAR);月/星期名为英文 |
+| `LAST_DAY(x)` | 当月最后一天(日期串) |
+| `DATE(x)` / `TIME(x)` | 日期部分 / 时刻部分 |
+| `DATE_FORMAT(x, fmt)` | **MySQL % 代码**(`%i`=分钟、`%M`=月名、`%k` 不补零等;strftime 代码请用 `STRFTIME`);未知代码输出裸字符 |
+| `TIMESTAMPDIFF(unit, from, to)` | 完整单位数(向零截断,可为负);unit 支持**裸写**(`TIMESTAMPDIFF(MINUTE, a, b)`,解析期校验)或字符串;MONTH/QUARTER/YEAR 按 MySQL 日号+时刻比较(`'2026-07-31'→'2027-03-01'` 为 7) |
+
+**数组**:
+
+| 函数 | 说明 |
+|------|------|
+| `ARRAY_MIN/ARRAY_MAX(arr)` | 数值元素的最小/最大(非数值元素跳过;无数值 → NULL) |
+| `ARRAY_DISTINCT(arr)` | 去重保序;可作量词源(`x = ANY(ARRAY_DISTINCT(tags))`) |
+| `ARRAY_POSITION(arr, v)` | 1 起首个等值位置;不存在 → NULL |
+
+**正则**(模式经与 `URL_MATCHQS` 相同的封顶缓存编译:4 KiB 尺寸上界 + 1024 条缓存上界;RE2 线性匹配无回溯灾难):
+
+| 函数 | 说明 |
+|------|------|
+| `REGEXP_SUBSTR(s, pat[, pos[, occ]])` | 第 occ 个匹配文本;无匹配 → NULL;pos/occ 为 1 起,非法 → NULL |
+| `REGEXP_INSTR(s, pat[, pos[, occ]])` | 匹配起点的 1 起 **rune** 位置;无匹配 → **0**(MySQL) |
+| `REGEXP_REPLACE(s, pat, repl)` | 全部替换,`$1` 组引用;输出投影超 1 MiB → NULL |
+
+**JSON**(与 `JSON_EXTRACT` 同为核心下降:文档字段**按原始值直读**,JSON 字符串与已解析对象/类型化集合两种行形态结果一致;路径参数必须是字符串字面量,坏路径在**加载期**报错):
+
+| 函数 | 说明 |
+|------|------|
+| `JSON_LENGTH(doc[, path])` | 对象=键数、数组=元素数、标量=1;路径缺失/坏文档 → NULL |
+| `JSON_TYPE(doc[, path])` | `'OBJECT'/'ARRAY'/'STRING'/'NUMBER'/'BOOLEAN'`(本引擎数字单一类,不分 INTEGER/DOUBLE) |
+| `JSON_VALID(x)` | 完整谓词:x 是可解析 JSON 字符串(含标量)或已解析对象/数组 → true;NULL/数字字段 → false |
+| `JSON_CONTAINS(doc, cand[, path])` | 完整谓词,MySQL 包含语义(对象子集、数组成员、`[[1]]` 不含 `1`、数字按数值);cand 先按 JSON 解析,解析失败按字符串标量(即 `'深圳'` 与 `'"深圳"'` 皆可——比 MySQL 宽容,已注明) |
+
+**集合**:`x [NOT] IN (SELECT col FROM coll [WHERE …])` 子查询成员测试(见 §4/§5.5)。
 
 ## 6. 函数用作谓词操作数 (Functions as predicate operands)
 

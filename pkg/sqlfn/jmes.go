@@ -41,7 +41,12 @@ func jmesCompiled(expr string) (*jmespath.JMESPath, error) {
 // kind becomes float64, an all-scalar array becomes []string (so the result
 // composes with ARRAY_CONTAINS / ARRAY_LENGTH / ...), and anything else —
 // missing paths, objects, mixed arrays, bad documents — is NULL.
-func JmesEval(raw any, expr string) any {
+//
+// Search runs inside a recover: go-jmespath is a third-party evaluator fed
+// row-data document shapes, and a panic on some pathological document must
+// degrade to NULL (fail-safe no-match) rather than reach a worker goroutine —
+// Program.Eval has no recover of its own.
+func JmesEval(raw any, expr string) (out any) {
 	root := jmesRoot(raw)
 	if root == nil {
 		return nil
@@ -50,6 +55,11 @@ func JmesEval(raw any, expr string) any {
 	if err != nil {
 		return nil
 	}
+	defer func() {
+		if recover() != nil {
+			out = nil
+		}
+	}()
 	res, err := jp.Search(root)
 	if err != nil {
 		return nil

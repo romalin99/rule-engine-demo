@@ -212,6 +212,11 @@ func (p *parser) parsePredicate() (Node, error) {
 				// MATCH('prefix', ...): row-level field-name prefix test
 				// (qlbridge exists(match("k_"))) — a complete predicate.
 				return PredCall(call), nil
+			case "JSON_CONTAINS", "JSON_VALID":
+				// Boolean JSON functions are complete predicates, like
+				// ARRAY_CONTAINS (they are core-lowered, so sqlfn.IsBoolFn
+				// below does not know them).
+				return PredCall(call), nil
 			}
 			// Extended boolean builtins (pkg/sqlfn: CONTAINS / STARTSWITH /
 			// ENDSWITH / EQ / GT / ...) are complete predicates on their own,
@@ -310,6 +315,13 @@ func (p *parser) parsePredicate() (Node, error) {
 		p.advance()
 		if _, err := p.expect(tLParen, "'(' after IN"); err != nil {
 			return nil, err
+		}
+		// `field [NOT] IN (SELECT col FROM coll [WHERE ...])` — the standard
+		// SQL sub-query membership form — desugars to the existing quantifier:
+		// IN ≡ `= ANY (...)`, NOT IN ≡ `!= ALL (...)` (two-value logic, like
+		// every other NULL-adjacent operator in this engine; see functions.md).
+		if p.cur().Kind == tSelect {
+			return p.finishInSubquery(FieldTerm{Name: field}, negate)
 		}
 		var vals []Value
 		for {
@@ -431,6 +443,23 @@ func (p *parser) finishCall(name string) (Term, error) {
 		return p.finishCast()
 	}
 	var args []Term
+	// TIMESTAMPDIFF(MINUTE, a, b): MySQL writes the unit as a bare keyword.
+	// Quote it into a string literal so the call is an ordinary builtin
+	// (TIMESTAMPDIFF('MINUTE', a, b) — the quoted spelling — also works, and
+	// is what Emit produces, so the round trip is stable).
+	if upper(name) == "TIMESTAMPDIFF" && p.cur().Kind == tIdent {
+		u := upper(p.cur().Text)
+		switch u {
+		case "SECOND", "MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "QUARTER", "YEAR":
+			p.advance()
+			args = append(args, LitTerm{Val: Value{IsString: true, Str: u}})
+			if _, err := p.expect(tComma, "',' after TIMESTAMPDIFF unit"); err != nil {
+				return nil, err
+			}
+		default:
+			return nil, fmt.Errorf("TIMESTAMPDIFF: unsupported unit %q (want SECOND/MINUTE/HOUR/DAY/WEEK/MONTH/QUARTER/YEAR)", p.cur().Text)
+		}
+	}
 	if p.cur().Kind != tRParen {
 		for {
 			arg, err := p.parseTerm()
@@ -550,6 +579,12 @@ func (p *parser) parseTermPredicate(left Term) (Node, error) {
 		if _, err := p.expect(tLParen, "'(' after IN"); err != nil {
 			return nil, err
 		}
+		// Sub-query membership with a term left operand, e.g.
+		// `LOWER(status) IN (SELECT s FROM history)` — same desugar as the
+		// bare-field branch in parsePredicate.
+		if p.cur().Kind == tSelect {
+			return p.finishInSubquery(left, negate)
+		}
 		var vals []Term
 		for {
 			v, err := p.parseTerm()
@@ -611,6 +646,28 @@ func (p *parser) parseTermPredicate(left Term) (Node, error) {
 	default:
 		return nil, fmt.Errorf("expected operator/BETWEEN/IN/LIKE/IS after function call, got %q", p.cur().Text)
 	}
+}
+
+// finishInSubquery parses the `SELECT col FROM coll [WHERE ...] )` tail of an
+// IN sub-query (the SELECT token has been peeked, '(' consumed) and desugars
+// membership to the quantifier node both runtimes already evaluate:
+// `x IN (SELECT ...)` ≡ `x = ANY (...)`; `x NOT IN (SELECT ...)` ≡
+// `x != ALL (...)` (equivalent under this engine's two-value logic).
+func (p *parser) finishInSubquery(left Term, negate bool) (Node, error) {
+	col, coll, where, err := p.parseSubSelect()
+	if err != nil {
+		return nil, err
+	}
+	if col == "" {
+		return nil, fmt.Errorf("IN sub-query must project a column (SELECT col FROM coll)")
+	}
+	if _, err := p.expect(tRParen, "')' to close IN sub-query"); err != nil {
+		return nil, err
+	}
+	if negate {
+		return QuantSub{Left: left, Op: "!=", All: true, Col: col, Coll: coll, Where: where}, nil
+	}
+	return QuantSub{Left: left, Op: "=", All: false, Col: col, Coll: coll, Where: where}, nil
 }
 
 // overlapToOr desugars ARRAY_OVERLAP(arr, v1, v2, ...) into an OR of
@@ -803,7 +860,8 @@ func (p *parser) parseQuant(left Term, op string, all bool) (Node, error) {
 // so it keeps the scalar value-list reading.
 func returnsArray(fn string) bool {
 	switch fn {
-	case "SPLIT", "MAPKEYS", "MAPVALUES", "ARRAY_SLICE", "DOMAINS", "HOSTS":
+	case "SPLIT", "MAPKEYS", "MAPVALUES", "ARRAY_SLICE", "DOMAINS", "HOSTS",
+		"ARRAY_DISTINCT":
 		return true
 	}
 	return false

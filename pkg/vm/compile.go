@@ -9,16 +9,47 @@ import (
 	"tcg-rulex-engine/pkg/sqlfn"
 )
 
+// maxIRDepth bounds IR nesting during compilation. Text rules are already
+// depth-bounded at 200 by the parser, so no parseable rule can get near this;
+// the guard exists for EXTERNALLY CONSTRUCTED IR (library users building
+// ir.Node values directly): the compiler walks the tree recursively, and a
+// pathologically deep tree would exhaust the goroutine stack — which Go
+// cannot recover (compileOne's recover never runs; the process dies). The
+// counter turns that into an ordinary compile error. Depth accumulates
+// across sub-query compilation (EXISTS/ANY/ALL/aggregate WHERE chains), so
+// nesting cannot hide inside nested sub-programs. The budget is the shared
+// ir.MaxNesting, the same limit the AST runtime, Emit and Optimize gate on.
+const maxIRDepth = ir.MaxNesting
+
 // Compile lowers an IR tree into bytecode. It is called once per rule at load
 // time; the resulting *Program is then evaluated many times.
 func Compile(n ir.Node) (*Program, error) {
+	p, err := compileAt(n, 0)
+	if err != nil {
+		return nil, err
+	}
+	// Structural self-check (pool indices, sub-program nesting): the compiler
+	// is correct by construction, so this is a load-time tripwire for future
+	// compiler bugs — better a loud compile error than a worker-side pool
+	// read that Eval would have to refuse. O(instructions), once per rule.
+	if err := p.check(); err != nil {
+		return nil, fmt.Errorf("vm: compiler self-check failed: %w", err)
+	}
+	return p, nil
+}
+
+// compileAt compiles with an inherited nesting depth (sub-query compilation
+// carries the parent's depth so the guard covers Where-chain recursion).
+func compileAt(n ir.Node, depth int) (*Program, error) {
 	c := &compiler{
 		p:        &Program{},
 		fieldIdx: map[string]int32{},
+		depth:    depth,
 	}
 	if err := c.emit(n); err != nil {
 		return nil, err
 	}
+	c.p.ok = true // compiled programs take Eval's fast path (see validate.go)
 	return c.p, nil
 }
 
@@ -34,6 +65,7 @@ func CompileString(rule string) (*Program, error) {
 type compiler struct {
 	p        *Program
 	fieldIdx map[string]int32
+	depth    int // current IR nesting depth (see maxIRDepth)
 }
 
 // substrToEnd is the sentinel length used to lower the 2-argument SUBSTRING(s,
@@ -78,6 +110,14 @@ func (c *compiler) setConst(vals []string) int32 {
 }
 
 func (c *compiler) emit(n ir.Node) error {
+	// Both recursion roots (emit for boolean nodes, emitTerm for operands)
+	// share the one depth budget; on overflow this returns an error BEFORE
+	// recursing, so the compiler never grows more than maxIRDepth frames.
+	c.depth++
+	defer func() { c.depth-- }()
+	if c.depth > maxIRDepth {
+		return fmt.Errorf("vm: IR nested too deeply (max %d levels)", maxIRDepth)
+	}
 	switch t := n.(type) {
 	case ir.Logic:
 		return c.emitLogic(t)
@@ -286,7 +326,7 @@ func (c *compiler) emitQuantArr(t ir.QuantArr) error {
 func (c *compiler) emitExists(t ir.Exists) error {
 	sub := SubProg{Coll: t.Coll}
 	if t.Where != nil {
-		w, err := Compile(t.Where)
+		w, err := compileAt(t.Where, c.depth) // inherit depth: Where chains count
 		if err != nil {
 			return fmt.Errorf("vm: EXISTS sub-query: %w", err)
 		}
@@ -307,7 +347,7 @@ func (c *compiler) emitQuantSub(t ir.QuantSub) error {
 	}
 	sub := SubProg{Coll: t.Coll, Col: t.Col, Op: op, All: t.All}
 	if t.Where != nil {
-		w, err := Compile(t.Where)
+		w, err := compileAt(t.Where, c.depth) // inherit depth: Where chains count
 		if err != nil {
 			return fmt.Errorf("vm: ANY/ALL sub-query: %w", err)
 		}
@@ -352,7 +392,7 @@ func (c *compiler) addJSON(j JSONOp) int32 {
 func (c *compiler) emitAgg(x ir.AggSub) error {
 	a := AggOp{Fn: x.Fn, Col: x.Col, Coll: x.Coll}
 	if x.Where != nil {
-		w, err := Compile(x.Where)
+		w, err := compileAt(x.Where, c.depth) // inherit depth: Where chains count
 		if err != nil {
 			return fmt.Errorf("vm: aggregate sub-query: %w", err)
 		}
@@ -429,6 +469,86 @@ func (c *compiler) emitJmes(x ir.CallTerm) error {
 	return nil
 }
 
+// emitJSONFn lowers JSON_LENGTH / JSON_TYPE(doc[, '$.path']). Like
+// JSON_EXTRACT, a field document is read raw at eval time; any other document
+// expression is rendered to a string first. The optional path must be a
+// string literal.
+func (c *compiler) emitJSONFn(x ir.CallTerm) error {
+	if len(x.Args) < 1 || len(x.Args) > 2 {
+		return fmt.Errorf("vm: %s expects 1 or 2 arguments, got %d", x.Fn, len(x.Args))
+	}
+	path := ""
+	if len(x.Args) == 2 {
+		lit, ok := x.Args[1].(ir.LitTerm)
+		if !ok || !lit.Val.IsString {
+			return fmt.Errorf("vm: %s path must be a string literal", x.Fn)
+		}
+		path = lit.Val.Str
+	}
+	fn := jsonFnLen
+	if x.Fn == "JSON_TYPE" {
+		fn = jsonFnType
+	}
+	if ft, ok := x.Args[0].(ir.FieldTerm); ok {
+		c.add(OpJSONFnField, c.addJSON(JSONOp{Path: path, FieldIdx: c.field(ft.Name), Fn: fn}))
+		return nil
+	}
+	if err := c.emitTerm(x.Args[0]); err != nil {
+		return err
+	}
+	c.add(OpJSONFnExpr, c.addJSON(JSONOp{Path: path, FieldIdx: -1, Fn: fn}))
+	return nil
+}
+
+// emitJSONValid lowers JSON_VALID(doc) — usable both as a standalone
+// predicate and as a boolean-valued term.
+func (c *compiler) emitJSONValid(x ir.CallTerm) error {
+	if len(x.Args) != 1 {
+		return fmt.Errorf("vm: JSON_VALID expects 1 argument, got %d", len(x.Args))
+	}
+	if ft, ok := x.Args[0].(ir.FieldTerm); ok {
+		c.add(OpJSONFnField, c.addJSON(JSONOp{FieldIdx: c.field(ft.Name), Fn: jsonFnValid}))
+		return nil
+	}
+	if err := c.emitTerm(x.Args[0]); err != nil {
+		return err
+	}
+	c.add(OpJSONFnExpr, c.addJSON(JSONOp{FieldIdx: -1, Fn: jsonFnValid}))
+	return nil
+}
+
+// emitJSONContains lowers JSON_CONTAINS(doc, candidate[, '$.path']). The
+// candidate is an ordinary term (evaluated on the stack); the optional path
+// must be a string literal.
+func (c *compiler) emitJSONContains(x ir.CallTerm) error {
+	if len(x.Args) < 2 || len(x.Args) > 3 {
+		return fmt.Errorf("vm: JSON_CONTAINS expects 2 or 3 arguments, got %d", len(x.Args))
+	}
+	path := ""
+	if len(x.Args) == 3 {
+		lit, ok := x.Args[2].(ir.LitTerm)
+		if !ok || !lit.Val.IsString {
+			return fmt.Errorf("vm: JSON_CONTAINS path must be a string literal")
+		}
+		path = lit.Val.Str
+	}
+	if ft, ok := x.Args[0].(ir.FieldTerm); ok {
+		if err := c.emitTerm(x.Args[1]); err != nil { // candidate
+			return err
+		}
+		c.add(OpJSONCntField, c.addJSON(JSONOp{Path: path, FieldIdx: c.field(ft.Name)}))
+		return nil
+	}
+	if err := c.emitTerm(x.Args[0]); err != nil { // document
+		return err
+	}
+	if err := c.emitTerm(x.Args[1]); err != nil { // candidate
+		return err
+	}
+	c.add(OpJSONCntExpr, c.addJSON(JSONOp{Path: path, FieldIdx: -1}))
+	return nil
+}
+
 // emitMapFn lowers MAPKEYS / MAPVALUES(field): the operand must be a field
 // reference, read raw at eval time (maps never travel on the value stack).
 func (c *compiler) emitMapFn(x ir.CallTerm) error {
@@ -471,6 +591,10 @@ func (c *compiler) emitPred(t ir.PredCall) error {
 	switch t.Fn {
 	case "MATCH":
 		return c.emitMatch(t)
+	case "JSON_CONTAINS":
+		return c.emitJSONContains(ir.CallTerm(t))
+	case "JSON_VALID":
+		return c.emitJSONValid(ir.CallTerm(t))
 	case "ARRAY_CONTAINS":
 		if len(t.Args) != 2 {
 			return fmt.Errorf("vm: ARRAY_CONTAINS expects 2 arguments, got %d", len(t.Args))
@@ -516,6 +640,11 @@ func (c *compiler) emitPred(t ir.PredCall) error {
 // emitTerm lowers a scalar operand (field, literal, or function call) so it
 // leaves exactly one value on the VM stack.
 func (c *compiler) emitTerm(t ir.Term) error {
+	c.depth++ // deep CALL nests recurse here without touching emit
+	defer func() { c.depth-- }()
+	if c.depth > maxIRDepth {
+		return fmt.Errorf("vm: IR nested too deeply (max %d levels)", maxIRDepth)
+	}
 	switch x := t.(type) {
 	case ir.FieldTerm:
 		c.add(OpLoadField, c.field(x.Name))
@@ -538,6 +667,17 @@ func (c *compiler) emitTerm(t ir.Term) error {
 		// MAPKEYS / MAPVALUES read a raw map (or JSON-object string) field.
 		if x.Fn == "MAPKEYS" || x.Fn == "MAPVALUES" {
 			return c.emitMapFn(x)
+		}
+		// The common-SQL JSON functions (round fourteen) share JSON_EXTRACT's
+		// raw-document lowering so pre-parsed object fields (kOpaque) work.
+		if x.Fn == "JSON_LENGTH" || x.Fn == "JSON_TYPE" {
+			return c.emitJSONFn(x)
+		}
+		if x.Fn == "JSON_VALID" {
+			return c.emitJSONValid(x)
+		}
+		if x.Fn == "JSON_CONTAINS" {
+			return c.emitJSONContains(x)
 		}
 		// SUBSTRING(s, start) (2-arg) means "from start to the end of the string".
 		// Lower it to the 3-arg opcode with a sentinel length that substr clamps

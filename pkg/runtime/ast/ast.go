@@ -35,9 +35,18 @@ func New() *Runtime { return &Runtime{} }
 func (*Runtime) Name() string { return "ast" }
 
 // Compile validates the program and returns it unchanged: the plan is the IR.
+// The one check with teeth is nesting depth: Execute walks the tree
+// recursively, and stack exhaustion on a pathologically deep EXTERNALLY BUILT
+// tree is a panic Go cannot recover — so it must be refused here, at the
+// load boundary, with an ordinary error. ir.NestingDepth is iterative and
+// therefore safe on any input; parser-produced trees (≤200 levels) are far
+// inside the shared ir.MaxNesting budget, matching the bytecode compiler.
 func (*Runtime) Compile(program api.Program) (api.Plan, error) {
 	if program == nil {
 		return nil, fmt.Errorf("ast: nil program")
+	}
+	if node, ok := program.(ir.Node); ok && ir.TooDeep(node) {
+		return nil, fmt.Errorf("ast: IR nested too deeply (max %d levels)", ir.MaxNesting)
 	}
 	return program, nil
 }
@@ -363,7 +372,9 @@ func jsonExtractAST(args []ir.Term, row map[string]any) any {
 }
 
 // jsonRoot returns a navigable JSON value: parses a JSON string, passes a
-// pre-decoded object/array through, rejects anything else.
+// pre-decoded object/array through (a typed []map[string]any nested-row
+// collection reads as the JSON array it is), rejects anything else. Kept in
+// lock-step with the VM's jsonRoot.
 func jsonRoot(raw any) any {
 	switch x := raw.(type) {
 	case string:
@@ -376,6 +387,12 @@ func jsonRoot(raw any) any {
 		return x
 	case []any:
 		return x
+	case []map[string]any:
+		out := make([]any, len(x))
+		for i, e := range x {
+			out[i] = e
+		}
+		return out
 	default:
 		return nil
 	}
@@ -713,6 +730,12 @@ func applyFunc(fn string, args []ir.Term, row map[string]any) any {
 		return jsonExtractAST(args, row)
 	case "JMESPATH", "JSON_JMESPATH":
 		return jmesAST(args, row)
+	case "JSON_LENGTH", "JSON_TYPE":
+		return jsonFnAST(fn, args, row)
+	case "JSON_VALID":
+		return jsonValidAST(args, row)
+	case "JSON_CONTAINS":
+		return jsonContainsAST(args, row)
 	case "MAPKEYS":
 		return mapPartsAST(args, row, false)
 	case "MAPVALUES":
@@ -737,7 +760,8 @@ func applyBuiltin(b *sqlfn.Builtin, args []ir.Term, row map[string]any) any {
 	for i, a := range args {
 		av[i] = argVal(a, row)
 	}
-	return b.Fn(av)
+	// SafeCall mirrors the VM's OpCallB: a panicking implementation is NULL.
+	return sqlfn.SafeCall(b, av)
 }
 
 // lengthAST implements LENGTH / LEN: the element count of an array operand
@@ -1024,6 +1048,15 @@ func evalPred(fn string, args []ir.Term, row map[string]any) bool {
 		}
 		return false
 	}
+	// The boolean common-SQL JSON functions (core-lowered, not registry
+	// builtins) are complete predicates, like ARRAY_CONTAINS.
+	if fn == "JSON_CONTAINS" {
+		return jsonContainsAST(args, row)
+	}
+	if fn == "JSON_VALID" {
+		b, _ := jsonValidAST(args, row).(bool)
+		return b
+	}
 	if bi, ok := sqlfn.Lookup(fn); ok && bi.Bool {
 		b, _ := applyBuiltin(bi, args, row).(bool)
 		return b
@@ -1095,6 +1128,74 @@ func toStringSlice(raw any) []string {
 // nested composites as "".
 func rawText(v any) string {
 	return valStr(termVal(v))
+}
+
+// jsonDocAST fetches a JSON document operand the way the VM does: a field is
+// read RAW (JSON string or pre-parsed object/collection — the kOpaque shapes),
+// any other term is evaluated and rendered to text.
+func jsonDocAST(arg ir.Term, row map[string]any) any {
+	if ft, ok := arg.(ir.FieldTerm); ok {
+		return row[ft.Name]
+	}
+	if v := evalTerm(arg, row); v != nil {
+		return valStr(v)
+	}
+	return nil
+}
+
+// jsonNavAST decodes a document and follows an optional literal path argument
+// (args[pathIdx]); ok=false on a bad document, non-literal path, or path miss.
+func jsonNavAST(args []ir.Term, pathIdx int, row map[string]any) (any, bool) {
+	root := jsonRoot(jsonDocAST(args[0], row))
+	if root == nil {
+		return nil, false
+	}
+	if len(args) <= pathIdx {
+		return root, true
+	}
+	lit, okLit := args[pathIdx].(ir.LitTerm)
+	if !okLit || !lit.Val.IsString {
+		return nil, false
+	}
+	return navigateJSON(root, lit.Val.Str)
+}
+
+// jsonFnAST mirrors the VM's jsonFnValue for JSON_LENGTH / JSON_TYPE
+// (semantics shared via pkg/sqlfn).
+func jsonFnAST(fn string, args []ir.Term, row map[string]any) any {
+	if len(args) < 1 || len(args) > 2 {
+		return nil
+	}
+	cur, ok := jsonNavAST(args, 1, row)
+	if !ok {
+		return nil
+	}
+	if fn == "JSON_LENGTH" {
+		return sqlfn.JSONLength(cur)
+	}
+	return sqlfn.JSONTypeOf(cur)
+}
+
+// jsonValidAST mirrors the VM's JSON_VALID lowering.
+func jsonValidAST(args []ir.Term, row map[string]any) any {
+	if len(args) != 1 {
+		return nil
+	}
+	return sqlfn.JSONValid(jsonDocAST(args[0], row))
+}
+
+// jsonContainsAST mirrors the VM's jsonContains (JSON_CONTAINS).
+func jsonContainsAST(args []ir.Term, row map[string]any) bool {
+	if len(args) < 2 || len(args) > 3 {
+		return false
+	}
+	// path (args[2]) applies to the document (args[0]); jsonNavAST expects the
+	// path right after the doc in its index argument.
+	tgt, ok := jsonNavAST(args, 2, row)
+	if !ok {
+		return false
+	}
+	return sqlfn.JSONDeepContains(tgt, sqlfn.JSONCandidate(argVal(args[1], row)))
 }
 
 // jmesAST evaluates JMESPATH / JSON_JMESPATH(doc, 'expr'), reading a field

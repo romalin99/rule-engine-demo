@@ -751,3 +751,139 @@ go build ./... && go test ./...
 go test ./pkg/vm/ -run 'TestArrayScalar|TestOpaque|TestBetweenTermBounds|TestSplitElementCap|TestExternalIR' -v
 go test ./pkg/vm/ -run TestDifferentialFuzz -v
 ```
+
+---
+
+## 十五、第九期(2026-07-03,第十四轮):"等 SQL 常用函数"口径补齐 —— 45 个函数 + IN 子查询
+
+本轮题面把每一类从"点名函数"扩到"**等 SQL 常用函数**"。以 MySQL 常用面为基准逐类盘点
+(与现有 85 个注册名 + 核心 opcode 零碰撞核对),补齐 45 个可调用名与 1 项语法:
+
+### 新增能力
+
+| 类别 | 新增 |
+|------|------|
+| 1 字符串(12) | `LTRIM RTRIM LEFT RIGHT REVERSE REPEAT LPAD RPAD LOCATE INSTR SUBSTRING_INDEX INITCAP`(全部 rune 计位,中文安全;`LOCATE` 缺失→0 对齐 MySQL,与 qlbridge `STRING_INDEX` 的 0 起字节/NULL 语义并存并注明) |
+| 3 集合(1 语法) | **`x [NOT] IN (SELECT col FROM coll [WHERE …])`** —— 解析期脱糖为既有 `QuantSub`(`= ANY` / `!= ALL`),零新 IR/opcode;`SELECT *` 作成员测试为解析错误 |
+| 4 数学(11) | `MOD SIGN TRUNCATE GREATEST LEAST EXP LN LOG LOG10 LOG2 PI`(`GREATEST/LEAST` 任一 NULL→NULL 对齐 MySQL;定义域/溢出统一 NULL) |
+| 2 日期(11) | `QUARTER WEEKOFYEAR(ISO) DAYOFYEAR DAYOFMONTH LAST_DAY MONTHNAME DAYNAME DATE TIME DATE_FORMAT(MySQL % 代码) TIMESTAMPDIFF`(**裸单位语法** `TIMESTAMPDIFF(MINUTE, a, b)` 解析期白名单;月差按 MySQL 日号+时刻比较) |
+| 5 数组(4) | `ARRAY_MIN ARRAY_MAX ARRAY_DISTINCT ARRAY_POSITION`(`ARRAY_DISTINCT` 已加入量词源白名单) |
+| 6 JSON(4) | `JSON_LENGTH JSON_TYPE JSON_VALID JSON_CONTAINS` —— **核心下降**(复用 JSON_EXTRACT 的 raw-doc 模式),字符串行与解析态(kOpaque)行结果一致;语义在 `pkg/sqlfn/json2.go` 单点实现双运行时共用;`JSON_VALID/JSON_CONTAINS` 兼作完整谓词;`jsonRoot` 同步接受 `[]map[string]any`(消除"`JSON_VALID(orders)` 真而 `JSON_LENGTH(orders)` NULL"的类内矛盾) |
+| 7 正则(3) | `REGEXP_SUBSTR REGEXP_INSTR REGEXP_REPLACE`(pos/occ 参数,rune 计位;沿用 URL_MATCHQS 的 4 KiB 模式上界 + 1024 封顶缓存;REPLACE 双重输出封顶) |
+
+注册表尾部追加,既有 OpCallB ID 零漂移(`TestSQLPlusIDStability` 钉死);第 8 项
+(qlbridge 91 名单)不受影响。
+
+### 差分验证先行抓到的 2 个实现缺陷(交付前修复)
+
+| # | 缺陷 | 修复 |
+|---|------|------|
+| 1 | `SUBSTRING_INDEX` 负 count 用 `LastIndex` **从右**扫描,重叠分隔符(`'深深深'` 含 `'深深'`)与 MySQL/split 的**从左非重叠**计数不一致 | 改双遍从左扫描(O(n) 时间 O(1) 分配,顺带避开 SPLIT 式切片放大);12 万随机 × split 参考零漂移 |
+| 2 | `monthsBetween` 用 Go `AddDate` 锚点,月末归一化(Jul 31 + 7M = "Feb 31" → Mar 3)使 `'2026-07-31'→'2027-03-01'` 得 6,MySQL 为 **7** | 改为 MySQL 的日号+时刻元组比较;20 万随机 × MySQL 规则复述零漂移 + 7 组真值向量 |
+
+### 改动文件
+
+| 文件 | 改动 |
+|------|------|
+| `pkg/sqlfn/sqlplus.go`(新增) | 字符串/数学/日期/数组/正则 41 个注册名 + 实现 |
+| `pkg/sqlfn/json2.go`(新增) | `JSONLength/JSONTypeOf/JSONValid/JSONCandidate/JSONDeepContains`(双运行时共用语义) |
+| `pkg/sqlfn/sqlfn.go` | `registerSQLPlus()` 尾部接线 |
+| `pkg/ir/parser.go` | `IN (SELECT…)` 两入口脱糖(`finishInSubquery`);`TIMESTAMPDIFF` 裸单位加引;`JSON_CONTAINS/JSON_VALID` 谓词路由;`returnsArray` + `ARRAY_DISTINCT` |
+| `pkg/vm/opcode.go` | `OpJSONFnField/OpJSONFnExpr/OpJSONCntField/OpJSONCntExpr`;`JSONOp.Fn` |
+| `pkg/vm/compile.go` | `emitJSONFn/emitJSONValid/emitJSONContains` 下降 + 路径字面量编译期校验 |
+| `pkg/vm/vm.go` | 新指令求值 + `jsonFnValue/jsonContains`;`jsonRoot` 接受 `[]map[string]any` |
+| `pkg/runtime/ast/ast.go` | `jsonDocAST/jsonNavAST/jsonFnAST/jsonValidAST/jsonContainsAST` 镜像;`jsonRoot` 同步 |
+| `pkg/vm/sqlplus_test.go`(新增) | 全部新函数 + IN 子查询 + 输出封顶 + ID 稳定性 + emit 往返,逐条断言 **bytecode == ast** |
+| `pkg/vm/differential_fuzz_test.go` | 新增第 25/26 类模板(常用函数、IN 子查询) |
+| `docs/functions.md` §5.9、`docs/security_review.md` §14、`README.md` | 文档同步 |
+
+### 本期验证
+
+- **Python 差分先行**:期望值全部先于实现独立推导(2026-07-03=Friday/第 184 天/ISO 周 27、
+  LAST_DAY、LOCATE rune 位、`REGEXP_INSTR('深圳abc123')=6`、DATE_FORMAT 25 码真值表、
+  JSON_CONTAINS 14 组 MySQL 真值);实现算法逐行移植回放:SUBSTRING_INDEX 12 万随机、
+  monthsBetween 20 万随机、LPAD/LOCATE 3 万随机、空匹配步进终止性 —— 共**抓出并修复上表
+  2 个缺陷后全部零漂移**。
+- tree-sitter-go:全仓(187 文件)语法零错误。
+- 本机执行(应全绿):
+
+```bash
+go build ./... && go test ./...
+go test ./pkg/vm/ -run 'TestSQLPlus|TestInSubquery' -v
+go test ./pkg/vm/ -run TestDifferentialFuzz -v
+```
+
+---
+
+## 十六、第十期(2026-07-03,第十五轮):Panic 风险专项 —— 全仓穷举 + 3 处加固
+
+本轮专题"深入分析可能 panic 的风险"。方法:按 panic 类(越界/除零/断言/递归栈耗尽/
+并发 map 写/三方库/协程边界/故意 panic)× 代码域(求值热路径/编译加载/协程起点/HTTP)
+做全仓穷举,逐条判定"已有防线 / 本轮加固 / 记录在案的残余"。完整矩阵见
+**[security_review.md §15](security_review.md)**。
+
+### 结论速览
+
+- **已有防线核对无恙**:VM 栈逐指令验界、切片全预夹紧(七轮 substr 回绕、normIndex、
+  clampLen…)、整数除零仅两处且均有界、`strings.Repeat` 负计数经值域证明、并发面
+  (sync.Map/分片归并/只读行)、协程起点 8 处全部 recover(matchInto/reloadSafely/
+  gos.Recover/Kafka worker/Fiber Recover/compileOne 背板)、`logs.Panic*` 与 pond 池
+  零调用点。
+- **本轮 3 处加固**:①`sqlfn.SafeCall` —— 130+ builtin(含 `mssola/user_agent` 等三方)
+  的**单点 panic 遏制**(两运行时唯一调用通道;panic → NULL + `RecoveredPanics()` 原子
+  计数),补上"库用户直调 `Program.Eval` 无 matchInto 兜底"的缺口;②`JmesEval` 内置
+  recover(go-jmespath 行数据面);③`vm.Compile` 深度守卫 `maxIRDepth`(500,双递归入口,
+  **跨子查询 Where 链继承深度**)——外部构造深 IR 的栈耗尽是 recover **不可捕获**的
+  fatal,唯一有效防御是递归前拦截,现转为普通编译错误。
+- **残余风险 4 项记录在案**(手工 Program 池索引、AST/Emit 对深外部 IR 的递归、启动期
+  fail-fast),均有明确信任边界与不修理由(见 §15.3)。
+
+### 改动文件
+
+| 文件 | 改动 |
+|------|------|
+| `pkg/sqlfn/sqlfn.go` | `SafeCall` + `RecoveredPanics()`(atomic) |
+| `pkg/vm/vm.go` | `OpCallB` 经 `SafeCall` 调用 builtin |
+| `pkg/runtime/ast/ast.go` | `applyBuiltin` 经 `SafeCall` |
+| `pkg/sqlfn/jmes.go` | `JmesEval` recover → NULL |
+| `pkg/vm/compile.go` | `maxIRDepth`/`compileAt`;`emit`+`emitTerm` 守卫;EXISTS/ANY/ALL/聚合子编译继承深度 |
+| `pkg/sqlfn/safecall_test.go`(新增) | panic / panic(nil) / 健康路径 / 计数 |
+| `pkg/vm/panic_safety_test.go`(新增) | 3 种 10 万层深 IR → 编译错误不崩溃;90 层文本规则仍编译;三方库因子 bytecode==ast |
+| `docs/security_review.md` | §15 panic 风险全矩阵(15.1 逐类 × 15.2 加固 × 15.3 残余) |
+
+### 本期验证
+
+- tree-sitter-go:全部改动/新增文件语法零错误(全仓 189 文件)。
+- 深度守卫算术走查:文本规则解析上限 200 → 编译深度 ≤ ~200 ≪ 500(2.5× 裕度);
+  测试含"90 层 `NOT (`"边界用例(每层耗 2 级解析深度,≈180,贴近解析上限)。
+- 本机执行(应全绿):
+
+```bash
+go build ./... && go test ./...
+go test ./pkg/vm/    -run 'TestCompileDepthGuard|TestBuiltinPanicContained' -v
+go test ./pkg/sqlfn/ -run TestSafeCall -v
+```
+
+### 追加(第十六轮,同日):§15.3 残余风险全部转为已修复
+
+按"修复风险"的要求,把第十五轮记录在案的 3 项残余逐一闭环(细节见
+security_review.md §15.3 更新):
+
+1. **手工 `vm.Program` 越界池索引 / 深手工 Where 链** → 新增 `Program.Validate()`
+   (迭代式全池验界 + 子程序嵌套上限);`Compile` 构造期置位 `ok`,**Eval 入口单个可预测
+   分支,编译产物零额外开销**;未校验程序惰性 check,坏程序 → false 不 panic;`Compile`
+   顶层自检成为未来编译器 bug 的加载期绊线。
+2. **AST 运行时深外部 IR** → `ast.Compile` 经 `ir.TooDeep`(迭代测深)拒绝,普通错误。
+3. **`Emit`/`EmitJSON`/`Optimize` 深外部 IR** → 公共入口统一挂门(`""` / 错误 / 原样
+   返回);门只跑一次,`Optimize` 内部递归与去重不重复测深(避免 O(n²));深度预算收敛为
+   单一 `ir.MaxNesting`(500),vm 编译器计数守卫同源。
+
+新增 `pkg/ir/depth.go`(`NestingDepth`/`TooDeep`,迭代实现)、`pkg/vm/validate.go`、
+`pkg/vm/validate_test.go`(8 类坏程序 + 10 万层手工链 + 合法手工/编译产物路径);
+`panic_safety_test.go` 扩展两运行时深 IR 与发射器降级断言。tree-sitter 全仓(192 文件)
+语法零错误。
+
+```bash
+go test ./pkg/vm/ -run 'TestValidateHandBuilt|TestCompileDepthGuard' -v
+go test ./...
+```
