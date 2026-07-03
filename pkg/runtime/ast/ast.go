@@ -96,8 +96,11 @@ func eval(n ir.Node, row map[string]any) (bool, error) {
 	case ir.In:
 		// NULL is never IN any list (mirrors the VM, which rejects kUndef even
 		// when the list contains '' — asString(nil) would otherwise match it).
+		// Neither is an ARRAY or OBJECT field (asString would render "" and
+		// match ''): they are not scalars, matching the VM's kArr/kOpaque
+		// guard (round thirteen).
 		in := false
-		if raw, present := row[t.Field]; present && raw != nil {
+		if raw, present := row[t.Field]; present && scalarRaw(raw) {
 			s := asString(raw)
 			for _, v := range t.Vals {
 				if s == litString(v) {
@@ -110,16 +113,19 @@ func eval(n ir.Node, row map[string]any) (bool, error) {
 
 	case ir.Like:
 		// NULL never matches a LIKE pattern (mirrors the VM's kUndef guard;
-		// asString(nil)="" would otherwise match '%' / '' patterns).
+		// asString(nil)="" would otherwise match '%' / '' patterns), and
+		// neither does an ARRAY/OBJECT field (kArr/kOpaque, round thirteen).
 		m := false
-		if raw, present := row[t.Field]; present && raw != nil {
-			m = like(asString(raw), t.Pattern)
+		if raw, present := row[t.Field]; present && scalarRaw(raw) {
+			m = like(asString(raw), t.Pattern, t.Wildcards)
 		}
 		return m != t.Negate, nil // NOT LIKE flips the match
 
 	case ir.IsNull:
-		v, present := row[t.Field]
-		isNull := !present || v == nil
+		// NULL ⇔ the VM would load kUndef: absent, nil, or an exotic Go type
+		// the value model cannot represent. Scalars, arrays and JSON objects /
+		// typed nested collections are present (kNum/kStr/kBool/kArr/kOpaque).
+		isNull := !presentRaw(row[t.Field])
 		if t.Negate {
 			return !isNull, nil
 		}
@@ -136,12 +142,25 @@ func eval(n ir.Node, row map[string]any) (bool, error) {
 		return compareVals(evalTerm(t.Left, row), t.Op, evalTerm(t.Right, row)), nil
 
 	case ir.LikeTerm:
+		// Computed arrays (SPLIT/…) are not scalar text: no match, like NULL
+		// (valStr([]string)="" would otherwise match '%' — VM kArr parity).
 		v := evalTerm(t.Left, row)
-		matched := v != nil && like(valStr(v), t.Pattern)
+		_, isArr := v.([]string)
+		matched := v != nil && !isArr && like(valStr(v), t.Pattern, t.Wildcards)
 		return matched != t.Negate, nil // NOT LIKE flips the match
 
 	case ir.IsNullTerm:
-		isNull := evalTerm(t.Left, row) == nil
+		// A field term mirrors OpLoadField→toValue presence exactly (arrays
+		// and objects are present; exotic types are NULL — evalTerm's termVal
+		// would nil arrays/objects and mis-report them as NULL here). Computed
+		// terms are NULL iff they evaluate to nil (a computed []string is a
+		// present kArr on the VM and a non-nil interface here).
+		var isNull bool
+		if ft, ok := t.Left.(ir.FieldTerm); ok {
+			isNull = !presentRaw(row[ft.Name])
+		} else {
+			isNull = evalTerm(t.Left, row) == nil
+		}
 		return isNull != t.Negate, nil // IS NOT NULL flips the test
 
 	case ir.PredCall:
@@ -158,8 +177,11 @@ func eval(n ir.Node, row map[string]any) (bool, error) {
 
 	case ir.Regexp:
 		v := evalTerm(t.Left, row)
-		if v == nil {
-			return t.Negate, nil // NULL never matches; NOT REGEXP on NULL -> true
+		if _, isArr := v.([]string); v == nil || isArr {
+			// NULL never matches — and neither does an array-valued term
+			// (computed arrays reach here as []string; valStr would render ""
+			// and match patterns like '^'). NOT REGEXP on both -> true.
+			return t.Negate, nil
 		}
 		re, err := compileRegexpCached(t.Pattern)
 		if err != nil {
@@ -178,6 +200,9 @@ var reCache sync.Map
 func compileRegexpCached(pattern string) (*regexp.Regexp, error) {
 	if v, ok := reCache.Load(pattern); ok {
 		return v.(*regexp.Regexp), nil
+	}
+	if len(pattern) > sqlfn.MaxRegexpPattern {
+		return nil, fmt.Errorf("ast: regexp pattern too long (%d > %d bytes)", len(pattern), sqlfn.MaxRegexpPattern)
 	}
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -455,6 +480,18 @@ func parseJSONPath(p string) ([]jsonSeg, bool) {
 
 // compare evaluates `field <op> literal`, numeric when both sides are numeric.
 func compare(raw any, op string, lit ir.Value) bool {
+	// A missing/NULL field compares UNKNOWN in SQL — no operator matches it.
+	// This mirrors the bytecode VM's kUndef guard and compareVals' nil guard;
+	// without it the string fallback below would compare asString(nil)="" and
+	// make `missing <= -75`, `missing != 'a'`, `missing < 'a'` all true.
+	// (Found by TestDifferentialFuzz iteration 102 on its first real run.)
+	// An ARRAY or OBJECT field also compares like NULL: it is not a scalar,
+	// so no operator matches it (asString would render "" and make
+	// `tags = ''` / `profile = ''` true). Mirrors the VM's scalarKind guard
+	// in compare (round thirteen).
+	if !scalarRaw(raw) {
+		return false
+	}
 	if !lit.IsString {
 		if fn, ok := toNum(raw); ok {
 			if ln, err := strconv.ParseFloat(lit.Num, 64); err == nil {
@@ -783,9 +820,11 @@ func parseDateFullAST(s string) (t time.Time, dateOnly, ok bool) {
 		"2006-01-02T15:04:05Z07:00",
 		"2006-01-02T15:04:05",
 		"2006-01-02",
+		"2006/01/02 15:04:05", // slash variants: keep in lock-step with the
+		"2006/01/02",          // bytecode VM and pkg/sqlfn (round eight)
 	} {
 		if tt, err := time.Parse(layout, s); err == nil {
-			return tt, layout == "2006-01-02", true
+			return tt, layout == "2006-01-02" || layout == "2006/01/02", true
 		}
 	}
 	return time.Time{}, false, false
@@ -891,8 +930,17 @@ func valStr(v any) string {
 
 // compareVals compares two normalized values with the VM's semantics: numeric
 // when both are numbers, otherwise lexical; a NULL operand makes it false.
+// An ARRAY operand (a computed []string from SPLIT/MAPKEYS/… — field arrays
+// are already nil'd by termVal) also makes it false, mirroring the VM's kArr
+// guard: an array is not a scalar.
 func compareVals(a any, op string, b any) bool {
 	if a == nil || b == nil {
+		return false
+	}
+	if _, ok := a.([]string); ok {
+		return false
+	}
+	if _, ok := b.([]string); ok {
 		return false
 	}
 	if af, aok := a.(float64); aok {
@@ -946,6 +994,8 @@ func parseDateAST(s string) (time.Time, bool) {
 		"2006-01-02T15:04:05Z07:00",
 		"2006-01-02T15:04:05",
 		"2006-01-02",
+		"2006/01/02 15:04:05", // slash variants: keep in lock-step with the
+		"2006/01/02",          // bytecode VM and pkg/sqlfn (round eight)
 	} {
 		if t, err := time.Parse(layout, s); err == nil {
 			return t, true
@@ -1119,20 +1169,33 @@ func sliceIntersect(a, b []string) bool {
 	return false
 }
 
-// like matches a SQL LIKE pattern using only leading/trailing '%' wildcards.
-func like(s, pattern string) bool {
-	hasPre := strings.HasPrefix(pattern, "%")
-	hasSuf := strings.HasSuffix(pattern, "%")
-	core := strings.Trim(pattern, "%")
-	switch {
-	case hasPre && hasSuf:
+// like matches a SQL LIKE pattern: full wildcard grammar when wildcards is
+// set (shared translation, see sqlfn.LikeRegexp), else the legacy four fast
+// shapes keyed on leading/trailing '%'.
+func like(s, pattern string, wildcards bool) bool {
+	// Full SQL wildcard grammar ('_', interior '%', backslash escapes) is
+	// evaluated via a shared anchored-regexp translation (sqlfn.LikeRegexp),
+	// keeping this runtime byte-for-byte consistent with the bytecode VM.
+	// wildcards=false (externally built IR) keeps the legacy literal shapes.
+	if wildcards && sqlfn.LikeNeedsRegexp(pattern) {
+		re, err := compileRegexpCached(sqlfn.LikeRegexp(pattern))
+		if err != nil {
+			return false
+		}
+		return re.MatchString(s)
+	}
+	// Legacy four-shape classification, shared with the bytecode compiler and
+	// the emitters via sqlfn.LikeShape (wildcards=false always classifies).
+	kind, core, _ := sqlfn.LikeShape(pattern, false)
+	switch kind {
+	case "contains":
 		return strings.Contains(s, core)
-	case hasSuf:
+	case "prefix":
 		return strings.HasPrefix(s, core)
-	case hasPre:
+	case "suffix":
 		return strings.HasSuffix(s, core)
-	default:
-		return s == pattern
+	default: // equals: core is the whole pattern
+		return s == core
 	}
 }
 
@@ -1190,12 +1253,52 @@ func asString(raw any) string {
 }
 
 func litNum(v ir.Value) (float64, bool) {
+	// Strings are never numbers in the engine's value model. The parser
+	// desugars string-bounded BETWEEN before a Between node is built, so this
+	// only affects externally constructed IR — where the bytecode VM refuses
+	// to compile a string bound; evaluating it as numeric here would give the
+	// two runtimes different semantics for the same node.
 	if v.IsString {
-		f, err := strconv.ParseFloat(v.Str, 64)
-		return f, err == nil
+		return 0, false
 	}
 	f, err := strconv.ParseFloat(v.Num, 64)
 	return f, err == nil
+}
+
+// scalarRaw reports whether a raw row value renders as scalar text / number /
+// boolean — the kinds every comparison, IN, LIKE and REGEXP operates on.
+// Mirrors the VM's scalarKind(toValue(raw)): arrays, JSON objects, typed
+// nested collections and exotic Go types are all excluded (they are NULL-like
+// in scalar predicate contexts; the ARRAY_* predicates, quantifiers,
+// sub-queries and JSON operators consume the non-scalar shapes).
+func scalarRaw(raw any) bool {
+	if raw == nil {
+		return false
+	}
+	if _, ok := toNum(raw); ok {
+		return true
+	}
+	switch raw.(type) {
+	case string, bool:
+		return true
+	}
+	return false
+}
+
+// presentRaw reports whether a raw row value is present (non-NULL) in the
+// VM's value model — i.e. whether OpLoadField would push anything but kUndef:
+// scalars (kNum/kStr/kBool), []string / []any arrays (kArr), and pre-parsed
+// JSON objects / typed nested-row collections (kOpaque). Exotic Go types the
+// model cannot represent load as kUndef and are therefore NULL.
+func presentRaw(raw any) bool {
+	if scalarRaw(raw) {
+		return true
+	}
+	switch raw.(type) {
+	case []string, []any, map[string]any, []map[string]any:
+		return true
+	}
+	return false
 }
 
 func litString(v ir.Value) string {

@@ -163,6 +163,19 @@ func (p *parser) parseUnary() (Node, error) {
 		}
 		return n, nil
 	}
+	// A literal on the LEFT of a predicate — standard SQL forms such as
+	// `'vip' = ANY (SELECT label FROM tags)`, `100 <= ALL (amounts)`,
+	// `'x' = other_field`. parsePredicate requires an identifier first, so route
+	// literal-led predicates through the term-based tail, which accepts any Term
+	// (literal / field / call) on the left and handles comparison / ANY / ALL /
+	// BETWEEN / IN / LIKE just like the function-call-led path.
+	if k := p.cur().Kind; k == tNumber || k == tString {
+		left, err := p.parseTerm()
+		if err != nil {
+			return nil, err
+		}
+		return p.parseTermPredicate(left)
+	}
 	return p.parsePredicate()
 }
 
@@ -253,31 +266,45 @@ func (p *parser) parsePredicate() (Node, error) {
 
 	case tBetween:
 		p.advance()
-		lo, err := p.parseValue()
+		loT, err := p.parseTerm()
 		if err != nil {
 			return nil, err
 		}
 		if _, err := p.expect(tAnd, "AND in BETWEEN"); err != nil {
 			return nil, err
 		}
-		hi, err := p.parseValue()
+		hiT, err := p.parseTerm()
 		if err != nil {
 			return nil, err
 		}
-		// Numeric bounds keep the compact numeric-range Between node. String bounds
-		// (e.g. date ranges like `register_date BETWEEN '2020-01-01' AND
-		// '2020-12-31'`) desugar into `field >= lo AND field <= hi`; both runtimes
-		// evaluate string comparisons with lexical ordering, which equals
-		// chronological order for ISO date strings. This also keeps the two
-		// runtimes consistent (the numeric-only Between path used to fail to
-		// compile on the bytecode VM and silently return false on the AST runtime).
-		if lo.IsString || hi.IsString {
-			return Logic{Op: "AND", Args: []Node{
-				Compare{Field: field, Op: ">=", Val: lo},
-				Compare{Field: field, Op: "<=", Val: hi},
-			}}, nil
+		loLit, loIsLit := loT.(LitTerm)
+		hiLit, hiIsLit := hiT.(LitTerm)
+		if loIsLit && hiIsLit {
+			lo, hi := loLit.Val, hiLit.Val
+			// Numeric bounds keep the compact numeric-range Between node. String
+			// bounds (e.g. date ranges like `register_date BETWEEN '2020-01-01'
+			// AND '2020-12-31'`) desugar into `field >= lo AND field <= hi`; both
+			// runtimes evaluate string comparisons with lexical ordering, which
+			// equals chronological order for ISO date strings. This also keeps the
+			// two runtimes consistent (the numeric-only Between path used to fail
+			// to compile on the bytecode VM and silently return false on the AST
+			// runtime).
+			if lo.IsString || hi.IsString {
+				return Logic{Op: "AND", Args: []Node{
+					Compare{Field: field, Op: ">=", Val: lo},
+					Compare{Field: field, Op: "<=", Val: hi},
+				}}, nil
+			}
+			return Between{Field: field, Lo: lo, Hi: hi}, nil
 		}
-		return Between{Field: field, Lo: lo, Hi: hi}, nil
+		// Field / function / sub-query bounds — `d BETWEEN DATE_SUB(CURRENT_DATE,
+		// 7) AND CURRENT_DATE`, `age BETWEEN min_age AND max_age` — desugar to
+		// term comparisons, exactly like the function-left BETWEEN in
+		// parseTermPredicate (which has accepted term bounds all along).
+		return Logic{Op: "AND", Args: []Node{
+			CompareTerm{Left: FieldTerm{Name: field}, Op: ">=", Right: loT},
+			CompareTerm{Left: FieldTerm{Name: field}, Op: "<=", Right: hiT},
+		}}, nil
 
 	case tIn:
 		p.advance()
@@ -308,7 +335,7 @@ func (p *parser) parsePredicate() (Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		return Like{Field: field, Pattern: s.Text, Negate: negate}, nil
+		return Like{Field: field, Pattern: s.Text, Negate: negate, Wildcards: true}, nil
 
 	case tRegexp:
 		p.advance()
@@ -559,7 +586,7 @@ func (p *parser) parseTermPredicate(left Term) (Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		return LikeTerm{Left: left, Pattern: s.Text, Negate: negate}, nil
+		return LikeTerm{Left: left, Pattern: s.Text, Negate: negate, Wildcards: true}, nil
 
 	case tRegexp:
 		p.advance()

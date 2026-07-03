@@ -10,7 +10,8 @@ const (
 	kNum
 	kStr
 	kBool
-	kArr // array of strings (backs the ARRAY_* functions)
+	kArr    // array of strings (backs the ARRAY_* functions)
+	kOpaque // present but non-scalar: a JSON object / typed row collection
 )
 
 // Value is a tagged union held on the VM stack. Using a flat struct (no
@@ -72,6 +73,16 @@ func toValue(raw any) Value {
 			out[i] = toValue(e).asString()
 		}
 		return arrV(out)
+	case map[string]any, []map[string]any:
+		// A pre-parsed JSON object or a typed nested-row collection IS a
+		// present value — `profile IS NOT NULL` must hold when the row carries
+		// a decoded object (it already held for the same document as a JSON
+		// string). It is just not scalar: every comparison / IN / LIKE /
+		// REGEXP / scalar function treats kOpaque like NULL, and the JSON /
+		// sub-query operators keep reading the raw field directly. (Mapping
+		// these to kUndef, as before round thirteen, made `profile IS NULL`
+		// true on the VM while the AST runtime said false.)
+		return Value{k: kOpaque}
 	default:
 		return undef
 	}

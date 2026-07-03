@@ -1,0 +1,76 @@
+[
+  {
+    "uid": 1,
+    "age": 32,
+    "city": "深圳",
+    "city_code": "SH",
+    "province": "广东",
+    "name": "vip",
+    "nickname": "VIP会员",
+    "phone": "13912345678",
+    "occupation": "工程师",
+    "income_level": "20k-30k",
+    "favorite_category": "数码",
+    "active_score": 96,
+    "score": 90,
+    "vip_level": 4,
+    "order_count": 60,
+    "risk_level": "低",
+    "marital_status": "已婚",
+    "delta": -3,
+    "rate": 0.861,
+    "temperature": 25,
+    "register_date": "2024-06-15",
+    "last_login": "2026-06-26",
+    "remark": null,
+    "csv_tags": "a,b,c",
+    "tags": ["高价值", "新客", "活跃"],
+    "interests": ["数码", "运动"],
+    "promo_targets": ["数码", "美妆"],
+    "profile": "{\"city\":\"深圳\",\"addr\":{\"zip\":\"518000\"}}",
+    "orders": [
+      {"amount": 120, "status": "已付"},
+      {"amount": 380, "status": "已付"}
+    ],
+    "tags_rows": [
+      {"label": "高价值"},
+      {"label": "新客"}
+    ]
+  },
+  {
+    "uid": 2,
+    "age": 19,
+    "city": "北京",
+    "city_code": "BJ",
+    "province": "北京",
+    "name": "Alice",
+    "nickname": "AL",
+    "phone": null,
+    "occupation": "学生",
+    "income_level": "<5k",
+    "favorite_category": "图书",
+    "active_score": 55,
+    "score": 58,
+    "vip_level": 1,
+    "order_count": 2,
+    "risk_level": "高",
+    "marital_status": "未知",
+    "delta": 8,
+    "rate": 0.5,
+    "temperature": -5,
+    "register_date": "2023-01-01",
+    "last_login": "2026-01-01",
+    "remark": "测试账号",
+    "csv_tags": "x,y",
+    "tags": ["普通"],
+    "interests": ["图书"],
+    "promo_targets": ["数码"],
+    "profile": "{\"city\":\"北京\",\"addr\":{\"zip\":\"100000\"}}",
+    "orders": [
+      {"amount": 30, "status": "待付"}
+    ],
+    "tags_rows": [
+      {"label": "普通"}
+    ]
+  }
+]

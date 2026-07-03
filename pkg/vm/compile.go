@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"tcg-rulex-engine/pkg/ir"
 	"tcg-rulex-engine/pkg/sqlfn"
@@ -90,8 +89,7 @@ func (c *compiler) emit(n ir.Node) error {
 		return c.emitIn(t)
 	case ir.Like:
 		c.add(OpLoadField, c.field(t.Field))
-		c.addLike(t.Pattern, t.Negate)
-		return nil
+		return c.addLike(t.Pattern, t.Negate, t.Wildcards)
 	case ir.IsNull:
 		c.add(OpLoadField, c.field(t.Field))
 		c.addIsNull(t.Negate)
@@ -108,8 +106,7 @@ func (c *compiler) emit(n ir.Node) error {
 		if err := c.emitTerm(t.Left); err != nil {
 			return err
 		}
-		c.addLike(t.Pattern, t.Negate)
-		return nil
+		return c.addLike(t.Pattern, t.Negate, t.Wildcards)
 	case ir.IsNullTerm:
 		if err := c.emitTerm(t.Left); err != nil {
 			return err
@@ -215,9 +212,28 @@ func (c *compiler) emitCompareTerm(t ir.CompareTerm) error {
 }
 
 // addLike appends the LIKE opcode matching the pattern's '%' placement (the
-// operand is already on the stack), negated when asked.
-func (c *compiler) addLike(pattern string, negate bool) {
-	kind, core := likeParts(pattern)
+// operand is already on the stack), negated when asked. Patterns that need the
+// full SQL wildcard grammar — '_' single-character wildcard, interior '%', or
+// backslash escapes — are lowered to a load-time-compiled anchored regexp
+// (sqlfn.LikeRegexp) instead of the four fast shapes. Every bundled front-end
+// opts in (wildcards=true; CEL/Expr escape their literals first); the zero
+// value keeps the legacy four-shape literal classification so externally
+// built IR keeps its old behaviour.
+func (c *compiler) addLike(pattern string, negate, wildcards bool) error {
+	if wildcards && sqlfn.LikeNeedsRegexp(pattern) {
+		idx, err := c.regexp(sqlfn.LikeRegexp(pattern))
+		if err != nil {
+			return err
+		}
+		c.add(OpRegexp, idx)
+		if negate { // NOT LIKE
+			c.add(OpNot, 0)
+		}
+		return nil
+	}
+	// Legacy four-shape classification, shared with the AST runtime and the
+	// emitters via sqlfn.LikeShape (wildcards=false always classifies).
+	kind, core, _ := sqlfn.LikeShape(pattern, false)
 	si := c.strConst(core)
 	switch kind {
 	case "prefix":
@@ -232,6 +248,7 @@ func (c *compiler) addLike(pattern string, negate bool) {
 	if negate { // NOT LIKE
 		c.add(OpNot, 0)
 	}
+	return nil
 }
 
 // addIsNull appends the IS [NOT] NULL opcode (the operand is on the stack).
@@ -348,7 +365,12 @@ func (c *compiler) emitAgg(x ir.AggSub) error {
 }
 
 // regexp compiles a pattern once at load time and returns its pool index.
+// Patterns beyond sqlfn.MaxRegexpPattern are rejected before compilation so a
+// hostile rule cannot spend unbounded memory/CPU in the regexp compiler.
 func (c *compiler) regexp(pattern string) (int32, error) {
+	if len(pattern) > sqlfn.MaxRegexpPattern {
+		return 0, fmt.Errorf("vm: regexp pattern too long (%d > %d bytes)", len(pattern), sqlfn.MaxRegexpPattern)
+	}
 	re, err := regexp.Compile(pattern)
 	if err != nil {
 		return 0, fmt.Errorf("vm: bad regexp %q: %w", pattern, err)
@@ -706,19 +728,3 @@ func cmpOp(op string) (OpCode, error) {
 	return 0, fmt.Errorf("vm: unsupported operator %q", op)
 }
 
-// likeParts classifies a LIKE pattern by '%' placement and returns the core text.
-func likeParts(pattern string) (kind, core string) {
-	pre := strings.HasPrefix(pattern, "%")
-	suf := strings.HasSuffix(pattern, "%")
-	core = strings.Trim(pattern, "%")
-	switch {
-	case pre && suf:
-		return "contains", core
-	case suf:
-		return "prefix", core // "abc%" -> hasPrefix abc
-	case pre:
-		return "suffix", core // "%abc" -> hasSuffix abc
-	default:
-		return "equals", core
-	}
-}

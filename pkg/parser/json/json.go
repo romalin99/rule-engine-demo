@@ -263,9 +263,9 @@ func (n node) leaf() (ir.Node, error) {
 			return nil, fmt.Errorf("json rule: like value must be string")
 		}
 		if plain {
-			return ir.Like{Field: n.Field, Pattern: s, Negate: n.Op != "like"}, nil
+			return ir.Like{Field: n.Field, Pattern: s, Negate: n.Op != "like", Wildcards: true}, nil
 		}
-		return ir.LikeTerm{Left: left, Pattern: s, Negate: n.Op != "like"}, nil
+		return ir.LikeTerm{Left: left, Pattern: s, Negate: n.Op != "like", Wildcards: true}, nil
 
 	case "regexp", "not_regexp", "rlike":
 		s, ok := n.Value.(string)

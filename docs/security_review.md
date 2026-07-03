@@ -158,7 +158,38 @@
 > 边界)+ 规则**编译**(本轮收口)+ 规则**解析**(深度界,native/两个 JSON 解析器全覆盖)三段全绿。
 > 新增回归:`pkg/parser/json/depth_test.go`、`TestSecurityCompilePanicContainment`。
 
-## 12. 未实施建议(Roadmap)
+## 12. LIKE 通配符与字符串/正则加固(第十轮,2026-07-03)
+
+第十轮以功能审计带出三处加固(功能修复本身见 sql_feature_audit.md 第十一节):
+
+| # | 风险点 | 状态 |
+|---|--------|------|
+| 1 | 🟡 **LIKE 语义缺口是"静默弱化"类风险**:`_` 与中间 `%` 此前按字面处理,`code LIKE '5__'` 之类的**校验/圈选规则永不按作者意图命中**(方向同第四轮的 `\d` 脱转义)。修复采用**加载期**把通配形状翻译为锚定 RE2:字面文本全部 `QuoteMeta`,模式仅由**规则字面量**构成(行数据不参与),RE2 线性匹配无 ReDoS;纯前缀/后缀/包含/等值仍走快速指令 | ✅ 本轮修复(`sqlfn.LikeRegexp`,VM 降为 `OpRegexp`,AST 同一翻译) |
+| 2 | 🟡 **CEL/Expr 字面量含 `%`/`_` 的语义混叠**:`startsWith('50%')` 拼出的 LIKE 模式会把 `%` 当通配符 | ✅ 本轮修复:前端先 `LikeEscape` 再拼模式(`\%` `\_` `\\`),字面语义保真;`ir.Like` 零值(Wildcards=false)保留四形状字面分类,外部构造的 IR 行为不变 |
+| 3 | 🟡 **REPLACE 内存放大 DoS**:规则文本不可信,`REPLACE(大字段, 'a', '20 字节')` 对 100KB 行数据投影 ~2MB、更长替换文本可达 GB 级单次分配(进程 OOM)。`CONCAT`/`JOIN` 为线性拼接,一并封顶防组合放大 | ✅ 本轮修复:**构建前**按 `strings.Count` 投影输出尺寸,超 `maxStringOut`(1 MiB)→ NULL(SQL 语义自然传播);良性用法不受影响 |
+| 4 | 🟡 **正则模式尺寸无显式上界**:规则模式(REGEXP/LIKE 翻译)与 `URL_MATCHQS` 的行数据驱动模式,尺寸仅受 Go regexp 内部程序上限约束,失败形态依赖 stdlib 细节 | ✅ 本轮修复:统一上界 `sqlfn.MaxRegexpPattern`(4 KiB)——VM 加载期、AST 惰性编译、sqlfn 动态编译三处同界,超限为清晰错误 |
+
+回归:`pkg/vm/like_wildcard_test.go`(通配语法 + 旧字面模式 + 尺寸上界 + bytecode==ast)、
+`pkg/sqlfn/like_test.go`(翻译/转义/往返 + REPLACE·CONCAT·JOIN 封顶 + 动态模式上界)、
+`pkg/parser/cel/cel_test.go`、`pkg/parser/expr/expr_test.go`(字面量转义)。
+
+## 13. 非标量操作数统一 + SPLIT 放大防护(第十三轮,2026-07-03)
+
+第十三轮以对抗视角专查**值模型边界**(数组/对象/异型 Go 值进入标量谓词路径)与
+**计算数组的内存核算**,修复 2 类正确性漂移、加固 1 处放大向量:
+
+| # | 风险点 | 状态 |
+|---|--------|------|
+| 1 | 🟠 **kArr 以 `""` 参与 VM 标量比较——规则语义漂移 + 双运行时分歧**:`tags = other_tags` 在字节码 VM 对**任意**两个数组字段恒真(kArr 渲染 "" 相等),`name = tags` 在 name 为空串时也真,`tags REGEXP '^'`、`tags LIKE '%'`、`tags IN ('')` 同理;AST 运行时(termVal 置 nil)全部判 false。**打分(VM)与解释(/evaluate,AST)结论相反**,且圈选规则可被空串/数组行数据意外命中——属"静默弱化"类。差分模糊器此前的标量比较模板从不抽取数组字段,故 12 轮未见 | ✅ 本轮修复:统一为"**非标量即 NULL**"——VM `compare`/`IN`/`LIKE`/`REGEXP` 增加 `scalarKind` 守卫,AST 以 `scalarRaw` 镜像;数组语义仅经 `ARRAY_*`/量词/子查询触达。模糊器新增第 24 类模板(数组×标量谓词)+ 行生成器混入 `[]string`/解析对象/类型化集合 |
+| 2 | 🟠 **已解析 JSON 对象 / 类型化集合装载为 kUndef**:`map[string]any` 行字段在 VM 判 `IS NULL` 为**真**(AST 为假)——`profile IS NOT NULL AND JSON_EXTRACT(profile,'$.city')='深圳'` 这类防御性写法在解析态行数据上**永不命中**(特性 6 的实际使用陷阱);`[]map[string]any` 同理 | ✅ 本轮修复:新增 `kOpaque` 值类("存在但非标量"),`IS [NOT] NULL` 视为存在,其余标量路径视同 NULL;AST 以 `presentRaw` 镜像同一分类;无法表示的异型 Go 值(如 `time.Time`)双方一致判 NULL |
+| 3 | 🟡 **SPLIT 无元素数上界——内存放大 DoS**:`[]string` 每元素 ~16 B 头部,`SPLIT(大字段, ',')` 可把 10 MiB 行值放大为 ~170 MiB 瞬时分配,× 规则 × 行 × worker;`maxStringOut`(第十轮)只覆盖字符串构建类,不覆盖数组构建 | ✅ 本轮修复:`maxArrayElems`(65536)——**分配前**以 `strings.Count` 计数,超限 → NULL;`DOMAINS`/`HOSTS` 的数组实参来自行字段或 SPLIT(已封顶),无独立放大面 |
+| 4 | 🟢 复核无恙,顺带对齐:AST `litNum` 曾把字符串界的外部构造 `Between` 按数值求值(VM 拒编译)——对齐为"字符串不是数字"(仅影响库用户直构 IR);`quote()` 发射 CEL/Expr/Aviator 字面量补反斜杠转义(先 `\\` 后引号),消除含 `\` 值的目标语言转义混叠 | ✅ 一并修复 |
+
+回归:`pkg/vm/array_scalar_test.go`(非标量×全谓词矩阵、kOpaque 存在性、BETWEEN
+项边界、SPLIT 上界、外部 IR 钉死,全部断言 **bytecode == ast**);模糊器模板与行
+生成器扩展后,该缺陷类纳入每次 `TestDifferentialFuzz` 的常规覆盖。
+
+## 14. 未实施建议(Roadmap)
 
 - 🔑 **控制台变更端点无鉴权**(`POST /rules`、`DELETE /rules/:id`、`POST /versions/:v/rollback`):
   企业部署下这是**首要加固项**。刻意不在库内硬编码鉴权(会给出虚假安全感,且租户/RBAC 模型需按部署

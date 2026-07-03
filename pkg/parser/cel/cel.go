@@ -27,6 +27,7 @@ import (
 
 	"tcg-rulex-engine/pkg/api"
 	"tcg-rulex-engine/pkg/ir"
+	"tcg-rulex-engine/pkg/sqlfn"
 )
 
 // Parser implements api.Parser using the CEL parser.
@@ -141,13 +142,16 @@ func callToIR(call celast.CallExpr) (ir.Node, error) {
 		if err != nil {
 			return nil, err
 		}
+		// The literal is escaped (LikeEscape) so '%'/'_' inside it stay
+		// literal text, then matched under the SQL wildcard grammar.
+		core := sqlfn.LikeEscape(lit.Str)
 		switch fn {
 		case "startsWith":
-			return ir.Like{Field: field, Pattern: lit.Str + "%"}, nil
+			return ir.Like{Field: field, Pattern: core + "%", Wildcards: true}, nil
 		case "endsWith":
-			return ir.Like{Field: field, Pattern: "%" + lit.Str}, nil
+			return ir.Like{Field: field, Pattern: "%" + core, Wildcards: true}, nil
 		default:
-			return ir.Like{Field: field, Pattern: "%" + lit.Str + "%"}, nil
+			return ir.Like{Field: field, Pattern: "%" + core + "%", Wildcards: true}, nil
 		}
 	}
 	return nil, fmt.Errorf("cel: unsupported function %q", fn)

@@ -473,3 +473,281 @@ go build ./... && go test ./...
 go test ./pkg/vm/ -run TestParity -v              # 第三批因子 + 转义/NULL 修复(bytecode==ast 交叉校验)
 go test ./pkg/ir/ -run 'TestLexString|TestEmitSQL|TestEscape' -v   # 词法/发射转义
 ```
+
+---
+
+## 十一、第五期(2026-07-03,第十轮):LIKE 通配符语义补全 + 日期解析统一 + 因子清单复核
+
+本期对 1-7 项特性做第十轮走查(视角:**基础算子的 SQL 标准符合度**——前九轮聚焦函数/谓词/
+运行时一致性,基础算子只覆盖了惯用形状),并首次在沙箱内直接 `git clone` qlbridge 源码
+复核第 8 项因子清单。
+
+### 修复的缺陷
+
+| # | 缺陷 | 修复 |
+|---|------|------|
+| 1 | 🐞 **`LIKE` 只识别四种形状**(等值/前缀/后缀/包含,按首尾 `%` 分类):`_` 通配符按字面下划线处理;**中间 `%`**(如 `name LIKE '数%城'`、`'a%b%c'`)被整体当作**字面等值**比较——标准 SQL 模式**静默永不命中**(两套运行时一致地错)。既有用例只写惯用形状,故九轮未暴露 | 新增共享翻译 `sqlfn.LikeNeedsRegexp/LikeRegexp`:含 `_`/转义/中间 `%` 的模式在**加载期**翻译为锚定 RE2(`%`→`(?s).*`、`_`→`.`、`\%` `\_` `\\` 转义、其余 `QuoteMeta`),VM 复用 `OpRegexp` 指令、AST 走同一翻译 + 缓存;四种快速形状**零改动零回退**。`NOT LIKE`/NULL 保持既有两值语义 |
+| 2 | 🐞 **CEL/Expr 字面量含 `%`/`_` 时语义混叠**:`startsWith('50%')` 直接拼进 LIKE 模式,`%` 被当通配符(修 1 后 `_` 亦然) | 前端拼模式前先 `sqlfn.LikeEscape`(转义 `% _ \`)并置 `Wildcards`;`ir.Like/LikeTerm` 新增 `Wildcards` 标志,零值=旧四形状字面分类,**外部构造的 IR 行为不变**。native/qlbridge/JSON/dtable 前端置位,模式按 SQL 语义解释 |
+| 3 | 🐞 **核心日期算子与扩展日期因子的可解析格式不一致**:`YEAR/DATEDIFF/DATE_ADD/…`(核心指令)只认 4 种 ISO 布局,而 `MM/DAYOFWEEK/TODATE/…`(sqlfn)另接受 `2006/01/02[ 15:04:05]` 斜杠变体——同一输入 `'2026/06/15'`,`MM(x)` 有值而 `YEAR(x)` 为 NULL | VM 与 AST 的核心解析布局补齐斜杠变体(两套运行时同步改,`DATE_ADD` 输出仍归一化为 ISO 连字符);三份布局清单(vm/ast/sqlfn)现已一致并互相注明 |
+
+### 安全加固(详见 security_review.md §12)
+
+| # | 加固 |
+|---|------|
+| 1 | `REPLACE` 输出**构建前**投影封顶(1 MiB → NULL):堵住"短规则 × 大行字符串"的内存放大 DoS;`CONCAT`/`JOIN` 同界防组合放大 |
+| 2 | 正则模式统一尺寸上界 `sqlfn.MaxRegexpPattern`(4 KiB):VM 加载期、AST 惰性编译、`URL_MATCHQS` 行数据驱动模式三处同界、清晰报错 |
+
+### 第 8 项复核:qlbridge 因子清单(本期新证据)
+
+本期沙箱可达 github.com,`git clone --depth 1 araddon/qlbridge` 后对 `expr/builtins` 全部
+`expr.FuncAdd` 注册名**重新机器比对**:实际注册名 92 个,其中 `emptyslice` 仅存在于
+`builtins_test.go`(测试辅助,非真实因子)——**真实清单 91 个,与第四期结论完全一致**:
+80 个已对齐(含别名;`TODATE(layout,x)` 参数序等语义抽查与源码一致),11 个(5 组)保持
+记录在案的不可移植理由(`map/mapinvert/maptime` 与 `useragent.map` 返回 map、VM 值栈无 map
+类型;`filter/filtermatch` 作用于实体字段集;函数式 `any/all/exists/not` 与关键字冲突;
+`uuid` 非确定性破坏可重放/审计)。**无新增可移植项。**
+
+### 改动文件
+
+| 文件 | 改动 |
+|------|------|
+| `pkg/sqlfn/like.go`(新增) | `LikeNeedsRegexp` / `LikeRegexp` / `LikeEscape` / `MaxRegexpPattern` |
+| `pkg/ir/ast.go`、`pkg/ir/parser.go` | `Like/LikeTerm.Wildcards` 标志;native 解析置位 |
+| `pkg/vm/compile.go` | `addLike` 通配形状降为 `OpRegexp`(带错误返回);`c.regexp` 尺寸上界 |
+| `pkg/vm/vm.go` | 日期布局补斜杠变体;`parseDateFull` 斜杠日期按 date-only 精度 |
+| `pkg/runtime/ast/ast.go` | `like()` 通配路径(共享翻译);两处日期布局对齐;惰性正则编译上界 |
+| `pkg/parser/cel/cel.go`、`pkg/parser/expr/expr.go` | 字面量 `LikeEscape` + `Wildcards` |
+| `pkg/engine/frontend_json.go`、`frontend_qlbridge.go`、`pkg/parser/json`、`pkg/parser/qlbridge`、`pkg/dtable` | SQL 语义前端置 `Wildcards` |
+| `pkg/sqlfn/strings.go` | `maxStringOut` 封顶(REPLACE 投影 / CONCAT / JOIN) |
+| `pkg/sqlfn/parity.go` | 动态模式尺寸上界(+`fmt` import) |
+| `pkg/vm/like_wildcard_test.go`、`pkg/sqlfn/like_test.go`、`pkg/parser/cel/cel_test.go`、`pkg/parser/expr/expr_test.go`(新增) | 全部新语义/上界回归,VM 用例逐条断言 **bytecode == ast** |
+| `docs/functions.md`、`docs/security_review.md` | §4 LIKE 通配全表 + §5.3 日期布局;安全评审 §12 |
+
+### 本期验证
+
+- 本环境依旧**无 Go 工具链**(实测 go.dev/dl、各镜像、GitHub release 资产域名均被网关拦截;
+  仅 github.com git 协议可达,用于 qlbridge 源码比对)。
+- **算法级 Python 对照**:`LikeRegexp/LikeEscape/LikeNeedsRegexp` 逐行移植 Python,回放本期
+  **全部**测试用例期望值(通配 27 例 + 旧字面 6 例 + 翻译表 6 组 + 转义往返 4 例 + 前端模式 4 例)
+  全部通过;另以 5000 组随机 `_`-free 边缘 `%` 模式对照**新旧实现零漂移**(快速形状语义不变);
+  REPLACE/CONCAT/JOIN 封顶算术、斜杠日期归一化(`2026/06/15 +1D → 2026-06-16`)经 Python 复算。
+  对照中还**纠正了一处本期新测试的期望值**(旧字面模式 `50\%` 对 `50\` 前缀应命中)——先于交付发现。
+- 括号/引号平衡:19 个改动/新增文件全部通过 Go 语法感知的配平检查。
+
+**请在本机执行**(应全绿):
+
+```bash
+go build ./... && go test ./...
+go test ./pkg/vm/     -run TestLikeWildcard -v        # LIKE 通配语法 + 上界(bytecode==ast)
+go test ./pkg/sqlfn/  -run 'TestLike|TestStringOutCap|TestRegexpPatternCap' -v
+go test ./pkg/parser/cel/ ./pkg/parser/expr/ -v       # 前端字面量转义
+```
+
+---
+
+## 十二、第六期(2026-07-03,第十一轮):Emit 往返保真 + 数值/并发面复核
+
+本轮换第十一个角度:**发射(Emit)方向与运行期一致性面**——前十轮聚焦"文本→IR→求值",
+本轮专查"IR→文本→IR"回环(决策表、`-export`、规则导出管道依赖它)与数值边界/并发正确性。
+
+### 修复的缺陷
+
+| # | 缺陷 | 修复 |
+|---|------|------|
+| 1 | 🐞 **旧式(Wildcards=false)Like 节点经 `Emit(SQL/JSON)` 往返后语义漂移**:第十轮引入通配语法后,SQL/JSON 前端把重新解析的模式一律按通配语义处理,而发射器原样输出旧式模式——外部构造 IR 中 `startsWith('a_b')` 型节点(模式 `a_b%`,`_` 本应字面)导出再装载后 `_` 变成了通配符;含内部 `%` 的旧式等值模式同理。捆绑前端不受影响(均已置位),受影响面是**库用户直构 IR + 导出管道** | 发射器对旧式节点**重编码**(`sqlfn.LikeLegacyWildcard`:结构性边缘 `%` 保留,核心文本转义 `_`/`\`/内部 `%`),使发射文本在通配语法下**语义精确等价**;通配节点原样发射(往返后仍为通配)。SQL 与 JSON 两个发射方向同步修复 |
+| 2 | 🐞 **CEL/Expr/Aviator 发射方向对通配模式的错误翻译**:`emitLike` 用旧的边缘 `%` 分类,把 `50\%%`(CEL 前端产物,意为 startsWith('50%'))发射成 `startsWith('50\')`;含 `_` 的通配模式翻译成错误的字面文本 | 新增 `sqlfn.LikeShape`(两种语法下的统一形状分类器,通配语法下解析转义、报告不可翻译):可翻译形状还原**未转义**字面量(`50\%%` → `startsWith('50%')`),不可翻译形状(`_`/内部 `%`)与其他不支持节点一致地发射空串;旧式节点保持历史翻译。`emit.go` 中重复的 likeParts 副本随之删除(消除三处分类器漂移面) |
+
+### 复核为一致/正确(不改)
+
+- **数值边界**:数值字符串在 `Between`/比较中两运行时**一致地不做**隐式强转(VM `toValue` 字符串→kStr、AST `toNum` 拒字符串);NaN 比较两侧均为 false(Go 浮点语义);浮点渲染两侧同为 `strconv.FormatFloat(x,'f',-1,64)`(含 `-0`、超大数)。
+- **并发面**:规则集以 `sync.Map` 快照 + `ReplaceRules` 原子换代,in-flight 匹配持旧快照;`Manager` 变更走 `sync.Mutex`。热重载路径无数据竞争红旗(与既有 reload_test 相符)。
+- **第 8 项(qlbridge 因子)**:清单已于第十轮以源码级机器比对定格(80/91 对齐 + 11 项记录在案),本轮复核跳过组的可移植性结论**不变**(map 值无消费路径 / 关键字冲突 / uuid 非确定性)。
+
+### 改动文件
+
+| 文件 | 改动 |
+|------|------|
+| `pkg/sqlfn/like.go` | 新增 `LikeShape`(统一形状分类)与 `LikeLegacyWildcard`(旧式→通配重编码) |
+| `pkg/ir/emit.go` | SQL 发射经 `likeEmitPattern`(旧式重编码);`emitLikePositive` 改用 `LikeShape`(转义还原 + 不可翻译→空);删除本地 likeParts 副本 |
+| `pkg/ir/emit_json.go` | JSON 发射同样经 `likeEmitPattern` |
+| `pkg/ir/emit_like_test.go`(新增) | 发射字符串断言(含 sqlStr 双反斜杠)、往返稳定性、CEL/Expr 还原与不可翻译空串 |
+| `pkg/vm/like_wildcard_test.go` | 追加 `TestLikeWildcardEmitRoundTrip`:旧式节点直评 vs 发射→重解析→评,双运行时逐行相等 |
+
+### 本期验证
+
+- 沙箱依旧无 Go 工具链(本轮再次穷举:ports/deb 镜像、GitHub release 资产域、conda/ghcr/docker
+  registry 均被网关拦截;仅 github.com git 可达)。
+- **Python 模糊对照**:`LikeShape/LikeLegacyWildcard` 逐行移植,以 2 万组随机模式×行串证明
+  **旧式语义 ≡ 重编码后通配语义**(零漂移);全部发射字符串期望(含 sqlStr 反斜杠加倍的合成)、
+  形状分类 9 例、往返不动点、VM 往返测试所用行×模式矩阵逐一复算通过。
+- 括号/引号配平:5 个改动/新增文件全部通过。
+
+**请在本机执行**(应全绿):
+
+```bash
+go build ./... && go test ./...
+go test ./pkg/ir/ -run TestEmitLike -v                 # 发射方向(SQL/JSON/CEL/Expr)
+go test ./pkg/vm/ -run TestLikeWildcardEmitRoundTrip -v # 往返语义等价(bytecode==ast)
+```
+
+### 追加:本机实测回报的修复(同日)
+
+用户执行 `go test ./...` 回报 `pkg/ir` 两例失败(`TestEmitJSONShapes`/`TestEmitJSONNestedLogic`):
+`EmitJSON` 输出 `{"op":"\u003e="}` 而测试期望 `{"op":">="}`。
+
+- **根因**:`EmitJSON` 用默认 `json.Marshal`,Go 会对 `< > &` 做 **HTML 转义**(`>=` →
+  `\u003e=`)。规则文档不是 HTML——会被存储、diff、人读,且算子表本身含 `>`/`<`;
+  测试锚定的可读拼写才是正确的规范形。该缺陷属**早前期次引入的 EmitJSON 实现**与其
+  测试期望之间的潜在错配(两种形式重解析语义相同,故此前各轮的往返/语义测试未暴露),
+  与本轮 LIKE 改动无关,但由本次全量实测暴露。
+- **修复**:`json.Encoder` + `SetEscapeHTML(false)`(去掉 `Encode` 追加的换行),
+  发射文档统一为文档化语法的字面拼写。两处断言的 12 个期望串经 Python 按
+  "排序键 + 紧凑分隔符 + 非 ASCII 原样"复刻 Go 编码器逐字节复核通过;
+  仓内无任何消费方依赖旧转义形(`docs.go` 中的 `\u003e` 为 swagger 生成的示例文本,
+  与本路径无关)。改动文件:`pkg/ir/emit_json.go`。
+
+---
+
+## 十三、第七期(2026-07-03,第十二轮):差分模糊测试 + 解析器包/AB 运行时收尾核查
+
+十一轮修补后,本轮的判断是:**单点走查的边际收益已经递减,该把"发现双运行时漂移"这件事
+自动化**——历史缺陷的最大单一类别正是 VM↔AST 分歧与 Emit 往返漂移(第二、四、五、八、十一轮
+累计 9 处)。故本轮交付一台**种子化差分模糊测试机**,并对此前各轮未点名的三个角落做收尾核查。
+
+### 新增:差分模糊测试(`pkg/vm/differential_fuzz_test.go`)
+
+- **覆盖**:22 类叶子模板(比较/区间/IN/完整通配 LIKE/空值/一元函数/ROUND·SUBSTRING 多态/
+  日期算术/正则(含 REGEXP_LIKE 标志)/数组三谓词/JSON 访问/EXISTS 两态/量词子查询/聚合子查询
+  双侧/计算数组量词/扩展布尔内建/COALESCE/字段对字段/字面量在左/term 判空/函数左 LIKE)×
+  AND/OR/NOT 深度 3 随机组合;行数据刻意混入缺失/NULL/错误类型/布尔字段。
+- **断言(每条规则 × 4 行)四向一致**:`vm == ast == vm(Emit(SQL) 重解析) == ast(重解析)`
+  ——一次同时看住**求值奇偶**与**发射往返**两个历史缺陷类。
+- **确定性**:固定种子(20260703),失败输出 iter/rule/emit/row 四元组可精确复现;
+  `-short` 下 400 条,全量 2500 条(秒级)。
+- **零噪声保证**:生成器 22 类模板逐一对照文法/编译器约束设计(BETWEEN 边界同型、正则池
+  RE2 安全、元数精确);并把生成器**移植 Python 接到第一轮的解析器/编译检查移植件**上,
+  2 万条随机规则全部解析+编译干净——`t.Fatalf` 只可能由真实引擎缺陷触发。
+  若它在您机器上报出分歧,那正是它的价值:请把失败四元组发回复盘。
+
+### 收尾核查(三处,均无需改码)
+
+| 角落 | 结论 |
+|------|------|
+| `pkg/parser/vitess` / `pkg/parser/native` | vitess 为**文档化 stub**(`Parse` 显式报"未实现",零依赖占位);native 全权委托 `ir.Parse` ——两者均无第十轮 `Wildcards` 遗漏面 |
+| CEL / Expr / qlbridge 三个 **A/B 运行时**的失败形态 | 超子集规则**一律在 Compile 期响亮报错**:CEL/Expr 因不支持节点发射空串 → 目标语言语法错误;qlbridge 因 REGEXP/子查询/未知函数名解析失败。且第十一轮的"不可翻译 LIKE → 空串"改动,把此前唯一的静默弱化路径(`50\%%` 被错译成语法合法、语义错误的 startsWith)也变成了响亮失败 |
+| 既有 `data/`、`examples/` 规则集受第十轮 LIKE 通配语义影响面 | 全库扫描:所有 LIKE 模式仅用边缘 `%`,无 `_`/`\`/内部 `%` ——**零行为变化** |
+
+### 文档
+
+- `functions.md §5.3` 增补**混合日期格式陷阱**:比较/BETWEEN 是纯字典序,连字符与斜杠格式
+  混用会得到错误顺序(`'2026/06/15' > '2026-12-31'`),应先 `TODATE(x)` 归一化。
+
+### 本期验证
+
+- 生成器模板 × 2 万条 Python 复核(见上);差分测试文件通过语法配平检查。
+- 本机执行(应全绿;首跑 `TestDifferentialFuzz` 即是对 1-7 项特性两套运行时的一次全面实测):
+
+```bash
+go test ./pkg/vm/ -run TestDifferentialFuzz -v
+go test ./...
+```
+
+### 追加:差分测试首跑即捕获 1 个潜伏 12 轮的真实缺陷(实测回报)
+
+用户首跑 `TestDifferentialFuzz` 于第 102 次迭代报出分歧:
+
+```
+rule="rate <= -75"   row={}   vm=false  ast=true
+```
+
+- **缺陷**:AST 运行时的遗留快路径 `compare()`(字段 vs 字面量)对**非数值操作数回落字符串比较**,
+  但未先判空——缺失/NULL 字段经 `asString(nil)=""` 参与字典序,导致 `missing <= -75`、
+  `missing != 'a'`、`missing < 'a'` 在 AST 侧恒为 **true**(VM 侧因 kUndef 守卫恒 false,符合
+  SQL "NULL 比较不命中"语义)。**潜伏原因**:此前所有 Compare 用例的行数据都是稠密的,
+  第四轮的 NULL 对齐只修了 `LIKE`/`IN`;`compareVals`(CompareTerm/量词路径)本就有 nil 守卫,
+  唯独这条最老的路径漏网。影响面含 `/evaluate` 的 Explain(AST 求值)——修复后其结论与线上
+  VM 打分一致。
+- **修复**:`compare()` 入口补 `raw == nil → false` 守卫(镜像 VM kUndef 与 `compareVals`),
+  一处修复覆盖唯一调用点;不改变任何**在场**值的比较行为(混型仍按两运行时一致的字典序回落)。
+- **回归**:新增 `pkg/vm/null_compare_test.go` —— 缺失/显式 nil × 6 算子 × 数值/字符串/空串/负数
+  字面量全矩阵钉死为 false(双运行时),外加 NOT 两值语义与在场值理智表(含"混型字典序回落"
+  这一确认为一致的语义:`'not-a-number' >= 5` 两侧同为 true);模糊器补上第 23 类模板
+  (**字段在左的量词**,左操作数可为 NULL 的路径),新模板经 Python 解析/编译移植件 4000 条复核干净。
+
+> 这正是第十二轮把验证自动化的预期回报:一台种子化差分测试机,首跑就抓到了十一轮人工
+> 走查都没碰到的角落。请重跑确认(应全绿):
+>
+> ```bash
+> go test ./pkg/vm/ -run 'TestDifferentialFuzz|TestNullCompare' -v
+> go test ./...
+> ```
+
+---
+
+## 十四、第八期(2026-07-03,第十三轮):值模型边界 —— 非标量操作数统一 + kOpaque
+
+本轮换第十三个角度:**值模型的种类边界**。前十二轮把标量语义(NULL/布尔/数值/字符串)
+和结构化算子(数组/JSON/子查询)各自查透,但从未对抗过"**结构化值闯进标量谓词路径**"
+这条缝——模糊器的标量比较模板也从不抽取数组字段(`fzArrFields` 只进 `ARRAY_*`/量词模板),
+正好是盲区。本轮环境仍无 Go 工具链,但**首次具备 tree-sitter-go**:全仓 183 个 Go 文件
+改前改后均零语法错误(强于历史轮次的括号配平)。
+
+### 修复的缺陷
+
+| # | 缺陷 | 修复 |
+|---|------|------|
+| 1 | 🐞 **数组字段以 `""` 参与 VM 标量比较,双运行时相反**:`compare`/`eq` 的字符串回落把 kArr 渲染为 `""`,于是字节码 VM 上 `tags = other_tags`(任意两个数组字段)、`name = tags`(name 为空串)、`tags <= nums` 恒真;`tags REGEXP '^'`、`tags LIKE '%'`、`tags IN ('')` 同理命中。AST 运行时 `termVal` 把数组置 NULL → 全部 false。线上打分(VM)与 `/evaluate` 解释(AST)**给出相反结论**。计算数组(`SPLIT(...) = ''`)在两侧都曾按 `""` 相等,双双错误 | 统一为"**非标量即 NULL**":VM `compare` 换 `scalarKind` 守卫(连带修正 QuantArr/QuantSub 中数组投影列的比较),`IN`/`LIKE*`/`REGEXP` 同守卫;AST 侧 `compare()`/`In`/`Like`/`LikeTerm`/`Regexp`/`compareVals` 以 `scalarRaw` 镜像。`IS [NOT] NULL` 仍视数组为**存在** |
+| 2 | 🐞 **已解析 JSON 对象/类型化集合装载为 kUndef**:行字段是 `map[string]any`(解析态 profile)或 `[]map[string]any`(类型化嵌套行)时,VM 判 `profile IS NULL` 为**真**而 AST 为假;防御性写法 `profile IS NOT NULL AND JSON_EXTRACT(profile,'$.city')='深圳'` 在解析态行上**永不命中**,同一文档改成 JSON 字符串却命中——特性 6 的现实陷阱 | 新增值类 **`kOpaque`**("存在但非标量"):`IS [NOT] NULL` 判存在,标量谓词/函数视同 NULL,JSON/子查询算子照常直读原始字段;AST 以 `presentRaw` 镜像同一分类。异型 Go 值(`time.Time` 等)双方一致判 NULL 并有用例钉死 |
+| 3 | 🐞 AST `litNum` 把字符串界的**外部构造** `Between` 按数值求值(VM 对同一节点拒编译)——同一 IR 两运行时语义不同 | `litNum` 对齐值模型("字符串不是数字")→ 求值 false;解析器路径不受影响(字符串界早已脱糖) |
+| 4 | 🐞 `Emit` 的 `quote()` 不转义反斜杠:含 `\` 的字面量发射到 CEL/Expr/Aviator 会被目标语言当转义序列(`'a\b'` → 退格) | 先转义 `\\` 再转义引号;Python 按 CEL/Expr 反转义规则回放 7 组含 `\`/引号/中文样例往返一致 |
+
+### 补齐的功能
+
+| # | 功能 | 说明 |
+|---|------|------|
+| 1 | ➕ **裸字段 `BETWEEN` 支持字段/函数边界**:`age BETWEEN min_age AND max_age`、`reg_date BETWEEN DATE_SUB(CURRENT_DATE, 7) AND CURRENT_DATE` 此前在裸字段左侧是**解析错误**(仅函数左侧的 `BETWEEN` 一直支持项边界——同一语法两个入口表达力不对等) | 边界解析为 Term:双字面量保持既有快路径/脱糖(零回退),否则脱糖为 `>= AND <=` 项比较;emit 往返稳定。特性 2("日期加减 + 比较")的常用写法就此闭环 |
+| 2 | 🧹 **合并三份 legacy LIKE 分类器**:`compile.go likeParts`/AST 内联/`sqlfn.LikeShape` 三处相同逻辑(第十一轮消掉 emit 侧一处后仍余三处) | 统一走 `sqlfn.LikeShape(pattern, false)`;Python 30 万随机样本证明新旧匹配零漂移 |
+
+### 安全加固(详见 security_review.md §13)
+
+- **SPLIT 元素数上界 `maxArrayElems`(65536)**:堵住 `[]string` 头部开销的内存放大
+  (10 MiB 行值 → ~170 MiB 瞬时分配 × 规则 × 行 × worker),分配前计数,超限 → NULL。
+
+### 第 8 项复核(本期新证据)
+
+沙箱 `git clone --depth 1 araddon/qlbridge` 重新机器比对 `expr/builtins`(排除
+`builtins_test.go`):真实注册名 **91 个,与第四、五期结论一致**——81 个已覆盖
+(75 registry + `MAPKEYS/MAPVALUES/CAST/MATCH/JMESPATH/LEN/COUNT/EXISTS` 等核心
+形态),10 个保持记录在案的不可移植理由(`map/mapinvert/maptime`、`filter/filtermatch`、
+函数式 `any/all/not`、`uuid`、`useragent.map`;函数式 `exists` 由 `EXISTS(...)` 语法
+与 `IS NOT NULL` 语义覆盖)。**无新增可移植项。**
+
+### 改动文件
+
+| 文件 | 改动 |
+|------|------|
+| `pkg/vm/value.go` | 新增 `kOpaque`;`toValue` 对 `map[string]any`/`[]map[string]any` 装载为 kOpaque |
+| `pkg/vm/vm.go` | `scalarKind` 辅助;`compare`/`unaryOp(IN/LIKE*/REGEXP)`/`callValue`/`substr` 非标量守卫 |
+| `pkg/vm/compile.go` | `likeParts` 删除,改用 `sqlfn.LikeShape` |
+| `pkg/runtime/ast/ast.go` | `scalarRaw`/`presentRaw` 分类器;`compare`/`In`/`Like`/`LikeTerm`/`Regexp`/`compareVals`/`IsNull`/`IsNullTerm` 镜像 VM;`litNum` 严格化;legacy like 走 `LikeShape` |
+| `pkg/ir/parser.go` | 裸字段 `BETWEEN` 项边界(双字面量零回退) |
+| `pkg/ir/emit.go` | `quote()` 反斜杠转义 |
+| `pkg/sqlfn/strings.go` | `maxArrayElems` + `SPLIT` 计数封顶 |
+| `pkg/vm/array_scalar_test.go`(新增) | 非标量×全谓词矩阵、kOpaque 存在性、BETWEEN 项边界(含 emit 往返)、SPLIT 上界、外部 IR 钉死 —— 逐条断言 **bytecode == ast** |
+| `pkg/vm/differential_fuzz_test.go` | 新增第 24 类模板(非标量×标量谓词);行生成器混入 `[]string` 数组、解析态 profile(kOpaque)、类型化 orders |
+| `docs/functions.md`、`docs/security_review.md`、`README.md` | §2 值类型表 + 非标量语义;§4 BETWEEN 边界;SPLIT 上界;security §13 |
+
+### 本期验证
+
+- **tree-sitter-go 语法验证**(本轮新增能力):全部改动文件 + 全仓 183 文件解析零错误。
+- **Python 交叉复核**:①SPLIT 上界边界(65536 通过 / 65537 → NULL);②legacy LIKE
+  新旧分类 30 万随机样本零漂移;③`quote()` 转义按 CEL/Expr 反转义规则往返一致;
+  ④VM 种类模型(kind) ≡ AST 原始值模型(guard)在"可比性/存在性"全矩阵上逐点相等
+  (数组/对象/异型/布尔/空串/缺失 × 双侧组合)。
+- 本机执行(应全绿;`TestDifferentialFuzz` 现在会常规命中本缺陷类):
+
+```bash
+go build ./... && go test ./...
+go test ./pkg/vm/ -run 'TestArrayScalar|TestOpaque|TestBetweenTermBounds|TestSplitElementCap|TestExternalIR' -v
+go test ./pkg/vm/ -run TestDifferentialFuzz -v
+```

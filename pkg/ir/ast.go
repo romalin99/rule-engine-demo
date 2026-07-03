@@ -39,11 +39,18 @@ type In struct {
 }
 
 // Like is `field LIKE 'pattern'` (Negate=false) or `field NOT LIKE 'pattern'`
-// (Negate=true).
+// (Negate=true). Wildcards selects full SQL LIKE semantics — '_' matches one
+// character, '%' anywhere in the pattern, backslash escapes (\% \_). Every
+// bundled front-end sets it: SQL-semantics fronts (native / qlbridge / JSON /
+// dtable) pass patterns through verbatim, while CEL/Expr fronts escape their
+// startsWith/endsWith/contains literals first (sqlfn.LikeEscape). The zero
+// value keeps the legacy four-shape literal classification, so externally
+// built IR keeps its old behaviour.
 type Like struct {
-	Field   string
-	Pattern string
-	Negate  bool
+	Field     string
+	Pattern   string
+	Negate    bool
+	Wildcards bool
 }
 
 // IsNull is `field IS NULL` (Negate=false) or `field IS NOT NULL` (Negate=true).
@@ -100,11 +107,12 @@ type CompareTerm struct {
 }
 
 // LikeTerm is `<term> LIKE 'pattern'` (Negate = NOT LIKE): the function-aware
-// form of Like, e.g. `LOWER(name) LIKE 'a%'`.
+// form of Like, e.g. `LOWER(name) LIKE 'a%'`. Wildcards as on Like.
 type LikeTerm struct {
-	Left    Term
-	Pattern string
-	Negate  bool
+	Left      Term
+	Pattern   string
+	Negate    bool
+	Wildcards bool
 }
 
 // IsNullTerm is `<term> IS NULL` (Negate = IS NOT NULL): the function-aware form

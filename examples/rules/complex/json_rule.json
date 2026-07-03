@@ -1,0 +1,98 @@
+[
+  {
+    "id": 1,
+    "name": "基础三叶 and(>=, in, isnotnull)",
+    "rule": "{\"and\":[{\"field\":\"age\",\"op\":\">=\",\"value\":18},{\"field\":\"city\",\"op\":\"in\",\"values\":[\"深圳\",\"广州\"]},{\"field\":\"phone\",\"op\":\"isnotnull\"}]}",
+    "enabled": true
+  },
+  {
+    "id": 2,
+    "name": "或与嵌套取反 or(>=, not(and))",
+    "rule": "{\"or\":[{\"field\":\"vip_level\",\"op\":\">=\",\"value\":5},{\"not\":{\"and\":[{\"field\":\"risk_level\",\"op\":\"=\",\"value\":\"高\"},{\"field\":\"order_count\",\"op\":\"<\",\"value\":5}]}}]}",
+    "enabled": true
+  },
+  {
+    "id": 3,
+    "name": "数值与日期双区间 between",
+    "rule": "{\"and\":[{\"field\":\"age\",\"op\":\"between\",\"values\":[25,40]},{\"field\":\"register_date\",\"op\":\"between\",\"values\":[\"2024-01-01\",\"2026-12-31\"]}]}",
+    "enabled": true
+  },
+  {
+    "id": 4,
+    "name": "集合正反 in + not_in",
+    "rule": "{\"and\":[{\"field\":\"province\",\"op\":\"in\",\"values\":[\"广东\",\"江苏\",\"浙江\"]},{\"field\":\"income_level\",\"op\":\"not_in\",\"values\":[\"<5k\",\"5k-10k\"]}]}",
+    "enabled": true
+  },
+  {
+    "id": 5,
+    "name": "模式正反 like + not_like",
+    "rule": "{\"and\":[{\"field\":\"favorite_category\",\"op\":\"like\",\"value\":\"数%\"},{\"field\":\"occupation\",\"op\":\"not_like\",\"value\":\"%学生%\"},{\"field\":\"nickname\",\"op\":\"like\",\"value\":\"%VIP%\"}]}",
+    "enabled": true
+  },
+  {
+    "id": 6,
+    "name": "空值组合 isnull/isnotnull + or",
+    "rule": "{\"and\":[{\"field\":\"remark\",\"op\":\"isnull\"},{\"field\":\"phone\",\"op\":\"isnotnull\"},{\"or\":[{\"field\":\"email\",\"op\":\"isnotnull\"},{\"field\":\"homepage\",\"op\":\"isnotnull\"}]}]}",
+    "enabled": true
+  },
+  {
+    "id": 7,
+    "name": "全比较算子 = == != <> > >= < <=",
+    "rule": "{\"and\":[{\"field\":\"age\",\"op\":\">=\",\"value\":18},{\"field\":\"score\",\"op\":\"==\",\"value\":90},{\"field\":\"marital_status\",\"op\":\"<>\",\"value\":\"未知\"},{\"field\":\"vip_level\",\"op\":\">\",\"value\":2},{\"field\":\"order_count\",\"op\":\"<\",\"value\":1000},{\"field\":\"active_score\",\"op\":\"<=\",\"value\":100},{\"field\":\"city\",\"op\":\"=\",\"value\":\"深圳\"},{\"field\":\"risk_level\",\"op\":\"!=\",\"value\":\"高\"}]}",
+    "enabled": true
+  },
+  {
+    "id": 8,
+    "name": "布尔值比较",
+    "rule": "{\"and\":[{\"field\":\"is_active\",\"op\":\"=\",\"value\":true},{\"field\":\"vip_level\",\"op\":\">=\",\"value\":1}]}",
+    "enabled": true
+  },
+  {
+    "id": 9,
+    "name": "深嵌套六层 and(or(between, and(>=, not(or(=, and(=, not(in)))))), isnotnull)",
+    "rule": "{\"and\":[{\"or\":[{\"field\":\"age\",\"op\":\"between\",\"values\":[25,40]},{\"and\":[{\"field\":\"vip_level\",\"op\":\">=\",\"value\":5},{\"not\":{\"or\":[{\"field\":\"risk_level\",\"op\":\"=\",\"value\":\"高\"},{\"and\":[{\"field\":\"marital_status\",\"op\":\"=\",\"value\":\"未知\"},{\"not\":{\"field\":\"province\",\"op\":\"in\",\"values\":[\"广东\",\"江苏\"]}}]}]}}]}]},{\"field\":\"phone\",\"op\":\"isnotnull\"}]}",
+    "enabled": true
+  },
+  {
+    "id": 10,
+    "name": "宽与六叶长链",
+    "rule": "{\"and\":[{\"field\":\"age\",\"op\":\">=\",\"value\":18},{\"field\":\"age\",\"op\":\"<=\",\"value\":65},{\"field\":\"active_score\",\"op\":\">=\",\"value\":60},{\"field\":\"vip_level\",\"op\":\">=\",\"value\":1},{\"field\":\"order_count\",\"op\":\">=\",\"value\":1},{\"field\":\"risk_level\",\"op\":\"!=\",\"value\":\"高\"}]}",
+    "enabled": true
+  },
+  {
+    "id": 11,
+    "name": "风控排除 not(or(in, and, like))",
+    "rule": "{\"not\":{\"or\":[{\"field\":\"risk_level\",\"op\":\"in\",\"values\":[\"高\",\"中高\"]},{\"and\":[{\"field\":\"order_count\",\"op\":\"<\",\"value\":1},{\"field\":\"register_date\",\"op\":\"<\",\"value\":\"2026-01-01\"}]},{\"field\":\"occupation\",\"op\":\"like\",\"value\":\"%黑产%\"}]}}",
+    "enabled": true
+  },
+  {
+    "id": 12,
+    "name": "新客召回 and(or(=, <=), >=, not(=))",
+    "rule": "{\"and\":[{\"or\":[{\"field\":\"order_count\",\"op\":\"=\",\"value\":0},{\"field\":\"order_count\",\"op\":\"<=\",\"value\":2}]},{\"field\":\"register_date\",\"op\":\">=\",\"value\":\"2026-01-01\"},{\"not\":{\"field\":\"risk_level\",\"op\":\"=\",\"value\":\"高\"}}]}",
+    "enabled": true
+  },
+  {
+    "id": 13,
+    "name": "高净值圈选 and(in, or(>=,>=,>=), not_in, like)",
+    "rule": "{\"and\":[{\"field\":\"city\",\"op\":\"in\",\"values\":[\"深圳\",\"广州\",\"杭州\"]},{\"or\":[{\"field\":\"vip_level\",\"op\":\">=\",\"value\":3},{\"field\":\"order_count\",\"op\":\">=\",\"value\":30},{\"field\":\"balance\",\"op\":\">=\",\"value\":100000}]},{\"field\":\"income_level\",\"op\":\"not_in\",\"values\":[\"<5k\",\"5k-10k\"]},{\"field\":\"favorite_category\",\"op\":\"like\",\"value\":\"数%\"}]}",
+    "enabled": true
+  },
+  {
+    "id": 14,
+    "name": "沉默唤醒 and(<=, >=, or(in, =))",
+    "rule": "{\"and\":[{\"field\":\"last_login\",\"op\":\"<=\",\"value\":\"2026-06-01\"},{\"field\":\"vip_level\",\"op\":\">=\",\"value\":2},{\"or\":[{\"field\":\"city\",\"op\":\"in\",\"values\":[\"深圳\",\"广州\"]},{\"field\":\"province\",\"op\":\"=\",\"value\":\"广东\"}]}]}",
+    "enabled": true
+  },
+  {
+    "id": 15,
+    "name": "双重否定 not(not(>=))",
+    "rule": "{\"not\":{\"not\":{\"field\":\"vip_level\",\"op\":\">=\",\"value\":1}}}",
+    "enabled": true
+  },
+  {
+    "id": 16,
+    "name": "全算子大满贯",
+    "rule": "{\"and\":[{\"field\":\"age\",\"op\":\"between\",\"values\":[18,65]},{\"or\":[{\"field\":\"city\",\"op\":\"in\",\"values\":[\"深圳\",\"广州\"]},{\"field\":\"province\",\"op\":\"not_in\",\"values\":[\"西藏\",\"青海\"]}]},{\"field\":\"favorite_category\",\"op\":\"like\",\"value\":\"数%\"},{\"field\":\"occupation\",\"op\":\"not_like\",\"value\":\"%学生%\"},{\"or\":[{\"field\":\"remark\",\"op\":\"isnull\"},{\"field\":\"nickname\",\"op\":\"isnotnull\"}]},{\"not\":{\"and\":[{\"field\":\"risk_level\",\"op\":\"=\",\"value\":\"高\"},{\"field\":\"is_active\",\"op\":\"!=\",\"value\":true}]}},{\"field\":\"rate\",\"op\":\">\",\"value\":0.5}]}",
+    "enabled": true
+  }
+]

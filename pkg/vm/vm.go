@@ -217,18 +217,23 @@ func binaryOp(op OpCode, a, b Value) bool {
 // unaryOp evaluates a single-operand opcode (set membership, the LIKE variants,
 // the IS [NOT] NULL pair, and NOT) against the top-of-stack value x.
 func (p *Program) unaryOp(in Instr, x Value) bool {
+	// NULL never matches, and neither does an ARRAY or OPAQUE operand (they
+	// are not scalar text; asString would render "" and let `tags IN ('')`,
+	// `tags LIKE '%'` or `tags REGEXP '^'` match — see compare). IS [NOT]
+	// NULL below intentionally still sees arrays/objects as present values.
+	scalar := scalarKind(x.k)
 	switch in.Op {
 	case OpIn:
 		_, ok := p.Sets[in.A][x.asString()]
-		return ok && x.k != kUndef
+		return ok && scalar
 	case OpLikePrefix:
-		return x.k != kUndef && strings.HasPrefix(x.asString(), p.Strs[in.A])
+		return scalar && strings.HasPrefix(x.asString(), p.Strs[in.A])
 	case OpLikeSuffix:
-		return x.k != kUndef && strings.HasSuffix(x.asString(), p.Strs[in.A])
+		return scalar && strings.HasSuffix(x.asString(), p.Strs[in.A])
 	case OpLikeContains:
-		return x.k != kUndef && strings.Contains(x.asString(), p.Strs[in.A])
+		return scalar && strings.Contains(x.asString(), p.Strs[in.A])
 	case OpLikeEq:
-		return x.k != kUndef && x.asString() == p.Strs[in.A]
+		return scalar && x.asString() == p.Strs[in.A]
 	case OpIsNull:
 		return x.k == kUndef
 	case OpIsNotNull:
@@ -238,15 +243,23 @@ func (p *Program) unaryOp(in Instr, x Value) bool {
 		// (so !non-bool stays false rather than silently becoming true).
 		return x.k == kBool && !x.b
 	case OpRegexp:
-		return x.k != kUndef && p.Regexps[in.A].MatchString(x.asString())
+		return scalar && p.Regexps[in.A].MatchString(x.asString())
 	default:
 		return false
 	}
 }
 
 // compare evaluates an ordering/equality opcode on two values.
+//
+// An ARRAY operand is treated like NULL: an array is not a scalar, so no
+// comparison operator matches it (round thirteen). Without this guard the
+// string fallback rendered kArr as "" — making `tags = other_tags` true for
+// ANY two array fields, `name = tags` true for an empty-string name, and
+// `tags REGEXP '^'`-style matches succeed — while the AST runtime (termVal
+// nils arrays) said false. Array semantics live in the ARRAY_* predicates
+// and the ANY/ALL quantifiers.
 func compare(a, b Value, op OpCode) bool {
-	if a.k == kUndef || b.k == kUndef {
+	if !scalarKind(a.k) || !scalarKind(b.k) {
 		return false
 	}
 	switch op {
@@ -282,10 +295,17 @@ func compare(a, b Value, op OpCode) bool {
 	return false
 }
 
+// scalarKind reports whether a value kind carries scalar text/number/boolean
+// content. kUndef (NULL), kArr (arrays) and kOpaque (objects / typed nested
+// collections) are excluded: no comparison, IN, LIKE or REGEXP matches them.
+func scalarKind(k vkind) bool {
+	return k == kNum || k == kStr || k == kBool
+}
+
 // callValue applies a single-operand scalar function to x. A NULL/undefined
 // input propagates as undef, and the math functions require a numeric operand.
 func callValue(op OpCode, x Value) Value {
-	if x.k == kUndef {
+	if x.k == kUndef || x.k == kOpaque {
 		return undef
 	}
 	// Scalar functions have no meaning for an array operand: NULL, matching
@@ -408,7 +428,7 @@ func valueAny(v Value) any {
 // with out-of-range start/length clamped to the empty string. A NULL input or
 // non-numeric start/length yields undef.
 func substr(s, start, length Value) Value {
-	if s.k == kUndef || s.k == kArr || start.k != kNum || length.k != kNum {
+	if !scalarKind(s.k) || start.k != kNum || length.k != kNum {
 		return undef
 	}
 	rs := []rune(s.asString())
@@ -433,14 +453,22 @@ func substr(s, start, length Value) Value {
 const (
 	dateLayout = "2006-01-02"
 	tsLayout   = "2006-01-02 15:04:05"
+	// Slash variants (round eight): accepted by the core date opcodes so
+	// YEAR/DATEDIFF/DATE_ADD/… agree with the extended date builtins
+	// (pkg/sqlfn MM/DAYOFWEEK/TODATE/…) on which strings are dates.
+	dateSlashLayout = "2006/01/02"
+	tsSlashLayout   = "2006/01/02 15:04:05"
 )
 
-// dateLayouts are tried in order when parsing date / datetime strings.
+// dateLayouts are tried in order when parsing date / datetime strings. It
+// mirrors pkg/sqlfn's list; pkg/runtime/ast carries the same set.
 var dateLayouts = []string{
 	tsLayout,
 	"2006-01-02T15:04:05Z07:00",
 	"2006-01-02T15:04:05",
 	dateLayout,
+	tsSlashLayout,
+	dateSlashLayout,
 }
 
 // parseDate parses a date/datetime string with the supported layouts.
@@ -516,7 +544,7 @@ func round2(x, d Value) Value {
 func parseDateFull(s string) (t time.Time, dateOnly, ok bool) {
 	for _, layout := range dateLayouts {
 		if tt, err := time.Parse(layout, s); err == nil {
-			return tt, layout == dateLayout, true
+			return tt, layout == dateLayout || layout == dateSlashLayout, true
 		}
 	}
 	return time.Time{}, false, false

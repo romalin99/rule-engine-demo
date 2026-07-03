@@ -103,7 +103,7 @@ func toIR(n expr.Node) (ir.Node, error) {
 			if err != nil {
 				return nil, err
 			}
-			return ir.Like{Field: field, Pattern: v.Str}, nil
+			return ir.Like{Field: field, Pattern: v.Str, Wildcards: true}, nil
 
 		default: // comparison: field <op> literal
 			field, err := identName(t.Args[0])

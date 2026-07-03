@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────────────────────────────────────
+# Expr 示例规则 —— expr-lang 前端 (engine.ExprFrontend)
+#
+# 库 / Library: github.com/expr-lang/expr v1.17.8  (https://expr-lang.org)
+#   前端源码 pkg/parser/expr。
+# 解析方式:parser.Parse —— 【仅语法解析,不编译/不需环境】,故变量无需声明;
+#   字符串单引号 '..' 与双引号 ".." 均合法(expr-lang 词法两者皆可)。
+#
+# 运行 / Run:
+#   go mod tidy                        # 首次:解析 expr-lang 依赖
+#   go run ./cmd/cli -frontend expr -rules examples/rules/expr.expr \
+#                    -users examples/rules/users.json
+#
+# 格式:每行一条 Expr 布尔表达式;'#' 注释;可选 "名称: 表达式"。
+# Expr 前端支持:&& || !(...)、比较、field in [列表]、
+#   【中缀运算符】field startsWith/endsWith/contains "x"(expr-lang 惯用形式,→ LIKE),
+#   函数形式 hasPrefix(field,"x")/hasSuffix(field,"x")(expr-lang 内建)亦可。
+#   复杂规则由这些【任意嵌套】组合。BETWEEN 用 f>=lo && f<=hi。
+#   正则/JSON/集合判断请用 native SQL。
+# ─────────────────────────────────────────────────────────────────────────
+
+# —— 基础 ——
+成年深广: age >= 18 && city in ['深圳', '广州']
+高分或高等级: active_score >= 85 || vip_level >= 3
+年龄区间: age >= 25 && age <= 40
+非高风险: !(risk_level == '高')
+省份集合: province in ['广东', '江苏', '浙江']
+类目前缀中缀: favorite_category startsWith '数'
+类目前缀函数: hasPrefix(favorite_category, '数')
+昵称包含: nickname contains 'VIP'
+排除省份: !(province in ['西藏', '青海'])
+
+# ═══ 复杂规则(&& || ! 与比较/in/字符串谓词任意嵌套)═══
+# —— 两组条件并联 ——
+双段人群: (age >= 25 && age <= 40) || (vip_level >= 5 && active_score >= 90)
+# —— 圈选 + 或分支 + 排除 ——
+高价值圈选: city in ['深圳', '广州'] && (vip_level >= 3 || order_count >= 30) && !(risk_level == '高')
+# —— 多字符串谓词(中缀)+ 集合 ——
+画像组合: name startsWith 'v' && nickname contains 'VIP' && province in ['广东', '江苏']
+# —— 前后缀择一 + 区间 + 取反包含 ——
+类目与年龄: (favorite_category startsWith '数' || favorite_category endsWith '码') && age >= 18 && !(occupation contains '学生')
+# —— 三层嵌套:或(与, 与(或)) ——
+三层嵌套: (city == '深圳' && vip_level >= 4) || (active_score >= 90 && (order_count >= 30 || nickname contains 'VIP'))

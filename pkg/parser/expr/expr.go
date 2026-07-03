@@ -26,6 +26,7 @@ import (
 
 	"tcg-rulex-engine/pkg/api"
 	"tcg-rulex-engine/pkg/ir"
+	"tcg-rulex-engine/pkg/sqlfn"
 )
 
 // Parser implements api.Parser using the expr-lang parser.
@@ -86,6 +87,29 @@ func convert(n exprast.Node) (ir.Node, error) {
 				vals = append(vals, v)
 			}
 			return ir.In{Field: field, Vals: vals, Negate: t.Operator == "not in"}, nil
+		case "startsWith", "endsWith", "contains":
+			// expr-lang exposes these as INFIX operators (`name contains "x"`),
+			// producing a BinaryNode — the idiomatic form. (The function-call
+			// forms hasPrefix/hasSuffix are builtins handled via callToIR below.)
+			// Map them to the same ir.Like patterns as their function twins.
+			field, err := identName(t.Left)
+			if err != nil {
+				return nil, err
+			}
+			lit, err := litVal(t.Right)
+			if err != nil {
+				return nil, err
+			}
+			// Escape the literal so '%'/'_' inside it stay literal text.
+			core := sqlfn.LikeEscape(lit.Str)
+			switch t.Operator {
+			case "startsWith":
+				return ir.Like{Field: field, Pattern: core + "%", Wildcards: true}, nil
+			case "endsWith":
+				return ir.Like{Field: field, Pattern: "%" + core, Wildcards: true}, nil
+			default: // contains
+				return ir.Like{Field: field, Pattern: "%" + core + "%", Wildcards: true}, nil
+			}
 		}
 		return nil, fmt.Errorf("expr: unsupported operator %q", t.Operator)
 
@@ -134,14 +158,14 @@ func callToIR(name string, args []exprast.Node) (ir.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	core := lit.Str
+	core := sqlfn.LikeEscape(lit.Str) // '%'/'_' in the literal stay literal
 	switch name {
 	case "hasPrefix", "startsWith":
-		return ir.Like{Field: field, Pattern: core + "%"}, nil
+		return ir.Like{Field: field, Pattern: core + "%", Wildcards: true}, nil
 	case "hasSuffix", "endsWith":
-		return ir.Like{Field: field, Pattern: "%" + core}, nil
+		return ir.Like{Field: field, Pattern: "%" + core, Wildcards: true}, nil
 	case "contains":
-		return ir.Like{Field: field, Pattern: "%" + core + "%"}, nil
+		return ir.Like{Field: field, Pattern: "%" + core + "%", Wildcards: true}, nil
 	}
 	return nil, fmt.Errorf("expr: unsupported call %q", name)
 }

@@ -1,0 +1,59 @@
+# ═════════════════════════════════════════════════════════════════════════
+# CEL 复杂规则样例 —— Google cel-go 前端 (engine.CELFrontend)
+#
+# 库 / Library: github.com/google/cel-go(CEL 规范 https://cel.dev,
+#   规范仓库 https://github.com/google/cel-spec)。前端源码 pkg/parser/cel。
+# 解析方式:env.Parse —— 仅语法解析、不做类型检查,变量无需声明;
+#   字符串单引号 '..' 与双引号 ".." 皆合法(CEL 文法 STRING)。
+#
+# 运行 / Run:
+#   go mod tidy      # 首次:解析 cel-go 依赖
+#   go run ./cmd/cli -frontend cel -rules examples/rules/complex/cel.cel \
+#                    -users examples/rules/complex/users.json
+#
+# 解析可用性验证 / Verify:
+#   go test ./pkg/engine/ -run TestComplexRuleFiles -v
+#
+# 本前端支持的形状(复杂规则=以下构造的任意深度嵌套):
+#   && || !(...)、比较(== != < <= > >=,字段在左/字面量在右)、
+#   field in [列表]、field.startsWith('x') / endsWith / contains(→ LIKE)。
+#   函数/正则/JSON/集合判断等高级特性请用 native SQL 前端。
+# 格式:每行一条 CEL 布尔表达式;'#' 注释;"名称: 表达式"。
+# ═════════════════════════════════════════════════════════════════════════
+
+# ─── 基础构造 ───
+成年深广: age >= 18 && city in ['深圳', '广州']
+六比较全用: age >= 18 && age <= 65 && vip_level > 2 && order_count < 1000 && risk_level != '高' && marital_status == '已婚'
+集合与排除: province in ['广东', '江苏', '浙江'] && !(income_level in ['<5k', '5k-10k'])
+前后缀择一: favorite_category.startsWith('数') || favorite_category.endsWith('码')
+包含与取反包含: nickname.contains('VIP') && !occupation.contains('学生')
+双引号混用: city == "深圳" && name == 'vip'
+小数比较: rate > 0.5 && rate <= 0.99 && active_score >= 85.5
+布尔字段: is_active == true
+字符串日期序: register_date >= '2024-01-01' && last_login <= '2026-12-31'
+
+# ─── 复杂规则:嵌套 / 长链 / 德摩根 / 谓词矩阵 ───
+# 两组人群并联:青壮年段,或高等级高活跃
+双段人群: (age >= 25 && age <= 40) || (vip_level >= 5 && active_score >= 90)
+# 三层嵌套:或(与, 与(或))
+三层嵌套: (city == '深圳' && vip_level >= 4) || (active_score >= 90 && (order_count >= 30 || nickname.contains('VIP')))
+# 四层嵌套 + 尾部整体排除
+四层嵌套: ((age >= 18 && (city == '深圳' || (province in ['广东', '江苏'] && active_score >= 70))) || vip_level >= 6) && !(risk_level == '高' && order_count < 2)
+# 高价值圈选:城市集合 + 等级/单量分支 + 风险排除 + 类目前缀
+高价值圈选: city in ['深圳', '广州', '杭州'] && (vip_level >= 3 || order_count >= 30) && !(risk_level == '高') && favorite_category.startsWith('数')
+# 七条件长链画像
+长链画像: age >= 18 && age <= 65 && active_score >= 60 && vip_level >= 1 && province in ['广东', '江苏', '浙江', '四川'] && !(occupation.contains('学生')) && phone.startsWith('1')
+# 德摩根形态:整体取反的或(内含与)
+德摩根组合: !(risk_level == '高' || (income_level in ['<5k'] && vip_level < 2))
+# 字符串谓词矩阵:名称前缀择一 + 手机前缀择一 + 邮箱后缀
+前缀矩阵: (name.startsWith('v') || name.startsWith('V')) && (phone.startsWith('139') || phone.startsWith('138')) && email.endsWith('.com')
+# 排除省份 + CSV 包含/类目等值择一
+排除与包含: !(province in ['西藏', '青海']) && (csv_tags.contains('b') || favorite_category == '数码')
+# 新客召回:少单 + 新近注册 + 非高风险(ISO 日期字符串按字典序比较)
+新客召回: (order_count == 0 || order_count <= 2) && register_date >= '2026-01-01' && !(risk_level == '高')
+# 沉默唤醒:久未登录 + 有等级 + 深广或广东
+沉默唤醒: last_login <= '2026-06-01' && vip_level >= 2 && (city in ['深圳', '广州'] || province == '广东')
+# 五层嵌套挑战:((与(或(与))) 或 (与)) 与 !(in)
+五层挑战: (((age >= 20 && age <= 60) && (vip_level >= 2 || (order_count >= 10 && active_score >= 75))) || (name == 'vip' && nickname.contains('VIP'))) && !(risk_level in ['高', '中高'])
+# 取反链:!接收者调用 与 !(in) 混合
+取反包含链: !name.contains('测试') && !email.endsWith('.test') && !(city in ['未知'])

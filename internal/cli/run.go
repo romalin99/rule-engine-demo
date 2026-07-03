@@ -136,7 +136,7 @@ func newEngine(cfg Config) *engine.Engine {
 //	go run ./cmd/cli -gen-rules 50000 -workers 64     # 自定义规模压测
 func RunCLI() {
 	cfg := DefaultConfig()
-	flag.StringVar(&cfg.RulesFile, "rules", "", "rules JSON file (default: generate)")
+	flag.StringVar(&cfg.RulesFile, "rules", "", "rules file: .json rule-set, or .sql/.cel/.expr text (one rule per line); default: generate")
 	flag.StringVar(&cfg.UsersFile, "users", "", "users JSON file (default: generate)")
 	flag.IntVar(&cfg.GenRules, "gen-rules", cfg.GenRules, "rules to generate")
 	flag.IntVar(&cfg.GenUsers, "gen-users", cfg.GenUsers, "users to generate")
@@ -237,14 +237,14 @@ func RunExport(cfg Config) error {
 		}
 	}
 	if !valid {
-		return fmt.Errorf("unknown DSL %q (want sql|aviator|cel|expr)", cfg.Export)
+		return fmt.Errorf("unknown DSL %q (want sql|aviator|cel|expr|json)", cfg.Export)
 	}
 
 	path := cfg.RulesFile
 	if path == "" {
 		path = "data/rules.json"
 	}
-	rules, err := engine.LoadRules(path)
+	rules, err := engine.LoadRulesAuto(path)
 	if err != nil {
 		return err
 	}
@@ -324,7 +324,9 @@ func Run(cfg Config) error {
 // cfg.GenRules 条。
 func loadOrGenRules(cfg Config, gen *ds.Generator) ([]model.Rule, error) {
 	if cfg.RulesFile != "" {
-		return engine.LoadRules(cfg.RulesFile)
+		// LoadRulesAuto dispatches by extension: .json → rule-set array,
+		// otherwise one rule expression per line (SQL/CEL/Expr text files).
+		return engine.LoadRulesAuto(cfg.RulesFile)
 	}
 	return gen.Rules(cfg.GenRules), nil
 }

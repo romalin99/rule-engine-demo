@@ -6,6 +6,7 @@
 package sqlfn
 
 import (
+	"fmt"
 	"math"
 	"net/url"
 	"regexp"
@@ -269,6 +270,11 @@ const reCacheMax = 1024
 func regexpCached(pattern string) (*regexp.Regexp, error) {
 	if v, ok := reCache.Load(pattern); ok {
 		return v.(*regexp.Regexp), nil
+	}
+	// URL_MATCHQS patterns may come from row data; cap their size before
+	// compilation so hostile rows cannot spend unbounded regexp-compiler CPU.
+	if len(pattern) > MaxRegexpPattern {
+		return nil, fmt.Errorf("sqlfn: regexp pattern too long (%d > %d bytes)", len(pattern), MaxRegexpPattern)
 	}
 	re, err := regexp.Compile(pattern)
 	if err != nil {

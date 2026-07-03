@@ -1,33 +1,53 @@
 package ir
 
-import "strings"
+import (
+	"strings"
+
+	"tcg-rulex-engine/pkg/sqlfn"
+)
 
 // DSL identifies a target output language.
 type DSL string
 
 const (
-	SQL     DSL = "sql"
-	Aviator DSL = "aviator"
-	CEL     DSL = "cel"
-	Expr    DSL = "expr"
+	SQL      DSL = "sql"
+	Aviator  DSL = "aviator"
+	CEL      DSL = "cel"
+	Expr     DSL = "expr"
+	JSONRule DSL = "json" // structured JSON predicate document (see EmitJSON)
 )
 
-// AllDSLs is the set of supported targets.
-var AllDSLs = []DSL{SQL, Aviator, CEL, Expr}
+// AllDSLs is the set of supported targets (SQL / Aviator / CEL / Expr are infix
+// expression dialects; JSONRule is the structured-document target handled by
+// EmitJSON — see Convert).
+var AllDSLs = []DSL{SQL, Aviator, CEL, Expr, JSONRule}
 
-// Emit renders an IR node into the given target DSL.
+// Emit renders an IR node into the given target DSL. For the infix dialects the
+// result is always a string; for JSONRule it delegates to EmitJSON and drops
+// the error (unrepresentable nodes yield ""), so callers that need to surface
+// that error should use EmitJSON or Convert instead.
 func Emit(n Node, d DSL) string {
-	if d == SQL {
+	switch d {
+	case SQL:
 		return emitSQL(n)
+	case JSONRule:
+		s, _ := EmitJSON(n)
+		return s
+	default:
+		return emitCode(n, d)
 	}
-	return emitCode(n, d)
 }
 
 // Convert parses a rule expression and emits it in the target DSL in one step.
+// Unlike Emit it surfaces the JSONRule emitter's error (some IR constructs have
+// no JSON-rule form — see EmitJSON).
 func Convert(rule string, d DSL) (string, error) {
 	n, err := Parse(rule)
 	if err != nil {
 		return "", err
+	}
+	if d == JSONRule {
+		return EmitJSON(n)
 	}
 	return Emit(n, d), nil
 }
@@ -53,10 +73,11 @@ func emitSQL(n Node) string {
 		}
 		return t.Field + " IN (" + sqlValList(t.Vals) + ")"
 	case Like:
+		pat := sqlStr(likeEmitPattern(t.Pattern, t.Wildcards))
 		if t.Negate {
-			return t.Field + " NOT LIKE " + sqlStr(t.Pattern)
+			return t.Field + " NOT LIKE " + pat
 		}
-		return t.Field + " LIKE " + sqlStr(t.Pattern)
+		return t.Field + " LIKE " + pat
 	case IsNull:
 		if t.Negate {
 			return t.Field + " IS NOT NULL"
@@ -67,10 +88,11 @@ func emitSQL(n Node) string {
 	case CompareTerm:
 		return emitTermSQL(t.Left) + " " + t.Op + " " + emitTermSQL(t.Right)
 	case LikeTerm:
+		pat := sqlStr(likeEmitPattern(t.Pattern, t.Wildcards))
 		if t.Negate {
-			return emitTermSQL(t.Left) + " NOT LIKE " + sqlStr(t.Pattern)
+			return emitTermSQL(t.Left) + " NOT LIKE " + pat
 		}
-		return emitTermSQL(t.Left) + " LIKE " + sqlStr(t.Pattern)
+		return emitTermSQL(t.Left) + " LIKE " + pat
 	case IsNullTerm:
 		if t.Negate {
 			return emitTermSQL(t.Left) + " IS NOT NULL"
@@ -276,6 +298,9 @@ func emitIn(t In, d DSL) string {
 
 func emitLike(t Like, d DSL) string {
 	pos := emitLikePositive(t, d)
+	if pos == "" { // untranslatable wildcard pattern: like other unsupported nodes
+		return ""
+	}
 	if t.Negate { // NOT LIKE -> logical-not of the match
 		return "!(" + pos + ")"
 	}
@@ -283,7 +308,14 @@ func emitLike(t Like, d DSL) string {
 }
 
 func emitLikePositive(t Like, d DSL) string {
-	kind, core := likeParts(t.Pattern)
+	// LikeShape resolves wildcard-grammar escapes into the literal core (so
+	// a CEL-built `50\%%` emits back as startsWith('50%')) and reports
+	// untranslatable patterns ('_' / interior '%'), which have no
+	// startsWith/endsWith/contains equivalent in these DSLs.
+	kind, core, ok := sqlfn.LikeShape(t.Pattern, t.Wildcards)
+	if !ok {
+		return ""
+	}
 	q := quote(core, d)
 	switch d {
 	case CEL:
@@ -322,29 +354,30 @@ func emitLikePositive(t Like, d DSL) string {
 	}
 }
 
-// likeParts classifies a LIKE pattern by % placement and returns the core text.
-func likeParts(pattern string) (kind, core string) {
-	pre := strings.HasPrefix(pattern, "%")
-	suf := strings.HasSuffix(pattern, "%")
-	core = strings.Trim(pattern, "%")
-	switch {
-	case pre && suf:
-		return "contains", core
-	case suf:
-		return "prefix", core // "abc%"  -> startsWith abc
-	case pre:
-		return "suffix", core // "%abc"  -> endsWith abc
-	default:
-		return "equals", core
+// likeEmitPattern renders a Like node's pattern for SQL/JSON emission. The SQL
+// front-ends re-parse emitted rules under the full wildcard grammar
+// (Wildcards=true), so a legacy node (Wildcards=false, four literal shapes)
+// must have its pattern re-encoded — escaping '_' / '\' / interior '%' — to
+// keep its exact meaning across the emit → parse round trip. Wildcard nodes
+// emit verbatim. (The historical likeParts classifier lives on as
+// sqlfn.LikeShape, shared by both emit directions and both runtimes.)
+func likeEmitPattern(pattern string, wildcards bool) string {
+	if wildcards {
+		return pattern
 	}
+	return sqlfn.LikeLegacyWildcard(pattern)
 }
 
-// quote wraps a string in the dialect's quote character, escaping any occurrence
-// of that character inside the value.
+// quote wraps a string in the dialect's quote character, escaping backslashes
+// and any occurrence of that character inside the value. Backslashes must be
+// escaped FIRST — CEL/Expr/Aviator string literals all treat '\' as an escape
+// introducer, so emitting a value like `a\b` verbatim would parse as the
+// (different, or invalid) escape sequence `\b` on the target engine.
 func quote(s string, d DSL) string {
 	q := "'"
 	if d == Expr {
 		q = "\""
 	}
+	s = strings.ReplaceAll(s, "\\", "\\\\")
 	return q + strings.ReplaceAll(s, q, "\\"+q) + q
 }

@@ -150,7 +150,7 @@ func (n jsonNode) leaf() (ir.Node, error) {
 		if !ok {
 			return nil, fmt.Errorf("json rule: like value must be string")
 		}
-		return ir.Like{Field: n.Field, Pattern: s, Negate: n.Op != "like"}, nil
+		return ir.Like{Field: n.Field, Pattern: s, Negate: n.Op != "like", Wildcards: true}, nil
 	case "isnull":
 		return ir.IsNull{Field: n.Field, Negate: false}, nil
 	case "isnotnull":

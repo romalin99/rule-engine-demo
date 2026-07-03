@@ -133,7 +133,7 @@ func (c Cond) toIR() (ir.Node, error) {
 		if !ok {
 			return nil, fmt.Errorf("like value must be string")
 		}
-		return ir.Like{Field: c.Field, Pattern: s}, nil
+		return ir.Like{Field: c.Field, Pattern: s, Wildcards: true}, nil
 	case "isnull":
 		return ir.IsNull{Field: c.Field, Negate: false}, nil
 	case "isnotnull":

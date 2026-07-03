@@ -9,6 +9,21 @@ import (
 // (qlbridge: tolower, strip, replace, split, join, contains, hasprefix,
 // hassuffix; plus the common SQL spellings STARTSWITH / ENDSWITH / CONCAT /
 // CHAR_LENGTH and TOUPPER for symmetry).
+// maxStringOut caps the output size of the string-building builtins
+// (REPLACE / CONCAT / JOIN). Rule text and row data are both untrusted; the
+// cap turns would-be memory-amplification (DoS) results into NULL, which SQL
+// semantics already propagate safely through every comparison. 1 MiB is far
+// beyond any legitimate rule-computed string.
+const maxStringOut = 1 << 20
+
+// maxArrayElems caps the element count of computed arrays (SPLIT). A []string
+// costs ~16 bytes of header per element on top of the shared backing text, so
+// splitting a large row string on a 1-byte separator would amplify a 10 MiB
+// row value into ~170 MiB of slice headers per evaluation — per rule × per
+// row × per worker. Oversized results are NULL (checked BEFORE allocating).
+// 65536 elements is far beyond any legitimate rule-side list.
+const maxArrayElems = 1 << 16
+
 func registerStrings() {
 	register([]string{"TOLOWER"}, 1, 1, false, func(a []any) any {
 		s, ok := str(a[0])
@@ -42,7 +57,12 @@ func registerStrings() {
 		return float64(utf8.RuneCountInString(s))
 	})
 	// REPLACE(s, old[, new]): replace every occurrence of old with new (new
-	// defaults to "" — i.e. remove old, matching qlbridge's replace).
+	// defaults to "" — i.e. remove old, matching qlbridge's replace). The
+	// projected output size is checked BEFORE building: rule text is untrusted
+	// in multi-tenant deployments, and REPLACE is the one string builtin whose
+	// output can exceed the sum of its inputs (each occurrence of old grows by
+	// len(new)-len(old)), so a short hostile rule against a large row string
+	// could otherwise force a multi-GB allocation. Oversized results are NULL.
 	register([]string{"REPLACE"}, 2, 3, false, func(a []any) any {
 		s, ok1 := str(a[0])
 		old, ok2 := str(a[1])
@@ -60,14 +80,24 @@ func registerStrings() {
 		if old == "" { // avoid Go's insert-between-every-rune behaviour
 			return s
 		}
+		if len(repl) > len(old) {
+			if n := strings.Count(s, old); len(s)+n*(len(repl)-len(old)) > maxStringOut {
+				return nil
+			}
+		}
 		return strings.ReplaceAll(s, old, repl)
 	})
 	// SPLIT(s, sep): split s around sep into an array. An empty separator
-	// yields NULL (rune-splitting is never what a rule intends).
+	// yields NULL (rune-splitting is never what a rule intends), and so does
+	// a result beyond maxArrayElems elements (memory-amplification guard —
+	// counted before allocating).
 	register([]string{"SPLIT"}, 2, 2, false, func(a []any) any {
 		s, ok1 := str(a[0])
 		sep, ok2 := str(a[1])
 		if !ok1 || !ok2 || sep == "" {
+			return nil
+		}
+		if strings.Count(s, sep)+1 > maxArrayElems { // see maxArrayElems
 			return nil
 		}
 		return strings.Split(s, sep)
@@ -96,6 +126,13 @@ func registerStrings() {
 		if parts == nil {
 			return nil
 		}
+		total := len(sep) * (len(parts) - 1)
+		for _, p := range parts {
+			total += len(p)
+		}
+		if total > maxStringOut { // see maxStringOut
+			return nil
+		}
 		return strings.Join(parts, sep)
 	})
 	// CONCAT(v1, v2, ...): concatenate rendered values. MySQL semantics: any
@@ -105,6 +142,9 @@ func registerStrings() {
 		for _, v := range a {
 			s, ok := str(v)
 			if !ok {
+				return nil
+			}
+			if sb.Len()+len(s) > maxStringOut { // see maxStringOut
 				return nil
 			}
 			sb.WriteString(s)
